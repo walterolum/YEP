@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    url: ${TEST_DB_URL:jdbc:mysql://localhost:3306/youthrise_test?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${TEST_DB_USERNAME:youthrise}
+    password: ${TEST_DB_PASSWORD:youthrise_dev}
+  flyway:
+    enabled: true
+    clean-disabled: false
+    locations: classpath:db/migration
+  jpa:
+    database-platform: org.hibernate.dialect.MariaDBDialect
+    hibernate:
+      ddl-auto: validate
+
+app:
+  security:
+    cookie-secure: false
+    bcrypt-strength: 4
+  mail:
+    mode: log
+  uploads:
+    directory: ${java.io.tmpdir}/youthrise-test-uploads
+
+logging:
+  level:
+    com.youthrise: WARN
+    org.springframework: WARN

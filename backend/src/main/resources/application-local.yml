@@ -1,0 +1,5 @@
+# Local development against MariaDB 12.x. Production uses MySQL 8 without an
+# explicit dialect. Activate with: --spring.profiles.active=local,demo
+spring:
+  jpa:
+    database-platform: org.hibernate.dialect.MariaDBDialect

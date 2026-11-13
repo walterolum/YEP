@@ -1,0 +1,9 @@
+# Demonstration profile. Never enable this profile in a deployed environment:
+# it adds a Flyway location that inserts fictional accounts and records.
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/demo
+
+logging:
+  level:
+    com.youthrise: DEBUG

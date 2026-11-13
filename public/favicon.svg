@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#D97706" />
+      <stop offset="60%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#FDE047" />
+    </linearGradient>
+    <linearGradient id="cb" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1D4ED8" />
+      <stop offset="50%" stop-color="#0284C7" />
+      <stop offset="100%" stop-color="#00E5FF" />
+    </linearGradient>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B1E36" />
+      <stop offset="100%" stop-color="#05101F" />
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="46" height="46" rx="13" fill="url(#bg)" stroke="#38BDF8" stroke-width="1.5" />
+  <path d="M12 36C14 28 17 20 22 15C19 19 16 26 14 36Z" fill="url(#g)" />
+  <path d="M10 26C15 23 20 18 22 13C17 17 12 21 9 26Z" fill="url(#g)" />
+  <path d="M38 17C32 20 27 26 24 35C26 27 30 20 38 17Z" fill="url(#cb)" />
+  <path d="M39 24C33 27 29 32 26 38C28 32 33 27 39 24Z" fill="url(#cb)" />
+  <path d="M24 13C23 22 21 31 16 38C22 32 24 23 24 13Z" fill="#FFFFFF" />
+  <polygon points="24,5 25.8,10.2 31,12 25.8,13.8 24,19 22.2,13.8 17,12 22.2,10.2" fill="#FDE047" />
+  <circle cx="24" cy="12" r="1.8" fill="#FFFBEB" />
+</svg>
