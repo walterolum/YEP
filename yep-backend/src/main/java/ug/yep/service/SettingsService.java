@@ -62,4 +62,15 @@ public class SettingsService {
     public record Policy(int minAge, int maxAge, int level2MinCompletion,
                          int level2MinAssessment, int level2MinAttendance) {
     }
+
+    /** Weights of the one overall score (Phase 2). Defaults: 40% lessons, 40% assessments, 20% attendance. */
+    public Weights weights() {
+        return new Weights(
+                integer("overall_weight_lessons", 40),
+                integer("overall_weight_assessments", 40),
+                integer("overall_weight_attendance", 20));
+    }
+
+    public record Weights(int lessons, int assessments, int attendance) {
+    }
 }

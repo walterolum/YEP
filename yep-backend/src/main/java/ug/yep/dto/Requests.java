@@ -30,6 +30,14 @@ public final class Requests {
             LocalDate dateOfBirth,
             @Size(max = 160) String institution,
             @Size(max = 120) String fieldOfStudy,
+            @Size(max = 20) String gender,
+            @Size(max = 40) String educationLevel,
+            @Size(max = 40) String employmentStatus,
+            @Size(max = 240) String careerGoal,
+            @Size(max = 8) String preferredLanguage,
+            Set<@Size(max = 80) String> interests,
+            Boolean termsAccepted,
+            Boolean privacyAccepted,
             String requestedLevel) {
     }
 
@@ -44,7 +52,13 @@ public final class Requests {
             LocalDate dateOfBirth,
             @Size(max = 160) String institution,
             @Size(max = 120) String fieldOfStudy,
-            Set<String> skills) {
+            @Size(max = 20) String gender,
+            @Size(max = 40) String educationLevel,
+            @Size(max = 40) String employmentStatus,
+            @Size(max = 240) String careerGoal,
+            @Size(max = 8) String preferredLanguage,
+            Set<String> skills,
+            Set<String> interests) {
     }
 
     public record PasswordChangeRequest(@NotBlank String currentPassword,
@@ -73,6 +87,64 @@ public final class Requests {
     }
 
     public record ApplyRequest(@NotNull Long programmeId) {
+    }
+
+    // ---------------------------------------------------------------- catalogue
+
+    public record AcademyRequest(
+            @NotBlank @Size(max = 160) String name,
+            @Size(max = 160) String slug,
+            @Size(max = 240) String tagline,
+            @Size(max = 4000) String description,
+            @Size(max = 16) String icon,
+            @Size(max = 16) String colour,
+            int sortOrder,
+            Boolean published) {
+    }
+
+    public record CareerPathRequest(
+            @NotNull Long academyId,
+            @NotBlank @Size(max = 160) String title,
+            @Size(max = 160) String slug,
+            @Size(max = 500) String summary,
+            @Size(max = 4000) String description,
+            @Size(max = 16) String icon,
+            int sortOrder,
+            Boolean published) {
+    }
+
+    /** {@code courseId} is optional in the body: the path supplies it. */
+    public record ModuleRequest(
+            Long courseId,
+            @NotBlank @Size(max = 120) String name,
+            @Size(max = 16) String icon,
+            @Size(max = 600) String outcome,
+            Integer sortOrder,
+            Integer level) {
+    }
+
+    /** {@code moduleId} is optional in the body: the path supplies it. */
+    public record LessonRequest(
+            Long moduleId,
+            @NotBlank @Size(max = 160) String title,
+            @NotBlank String type,
+            Integer sortOrder,
+            @Size(max = 20000) String content,
+            Integer durationMinutes) {
+    }
+
+    public record CourseRequest(
+            @NotNull Long careerPathId,
+            @NotBlank @Size(max = 40) String code,
+            @NotBlank @Size(max = 160) String title,
+            @Size(max = 160) String slug,
+            @Size(max = 500) String summary,
+            @Size(max = 4000) String description,
+            @Min(1) @Max(2) int level,
+            @Min(0) int durationHours,
+            @Size(max = 16) String icon,
+            int sortOrder,
+            Boolean published) {
     }
 
     public record CreateProjectRequest(@NotBlank @Size(max = 160) String title,

@@ -59,7 +59,7 @@ class CertificateServiceTest {
     private Views.ProgressView progress(int levelOne, int levelTwo) {
         return new Views.ProgressView(levelOne, 15, 15, levelTwo, true, true,
                 4, 4, 80, 100, levelOne == 100 && levelTwo == 100,
-                new Views.PolicyView(18, 35, 80, 65, 75), Map.of());
+                new Views.PolicyView(18, 35, 80, 65, 75), Map.of(), 88, Map.of());
     }
 
     @Test

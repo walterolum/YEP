@@ -29,17 +29,24 @@ public final class Views {
     }
 
     public record UserView(Long id, String fullName, String email, String phone, String role,
-                           String status, String country, String district, LocalDate dateOfBirth,
-                           String institution, String fieldOfStudy, String requestedLevel,
-                           String avatar, Set<String> skills, Instant lastLoginAt, Instant createdAt) {
+                           String status, String gender, String country, String district,
+                           LocalDate dateOfBirth, String institution, String fieldOfStudy,
+                           String educationLevel, String employmentStatus, String careerGoal,
+                           String preferredLanguage, String requestedLevel, String avatar,
+                           Set<String> skills, Set<String> interests, Instant termsAcceptedAt,
+                           Instant privacyAcceptedAt, Instant emailVerifiedAt, Instant lastLoginAt,
+                           Instant createdAt) {
 
         public static UserView of(User user) {
             return new UserView(user.getId(), user.getFullName(), user.getEmail(), user.getPhone(),
-                    user.getRole().name(), user.getStatus().name(), user.getCountry(), user.getDistrict(),
-                    user.getDateOfBirth(), user.getInstitution(), user.getFieldOfStudy(),
+                    user.getRole().name(), user.getStatus().name(), user.getGender(), user.getCountry(),
+                    user.getDistrict(), user.getDateOfBirth(), user.getInstitution(),
+                    user.getFieldOfStudy(), user.getEducationLevel(), user.getEmploymentStatus(),
+                    user.getCareerGoal(), user.getPreferredLanguage(),
                     user.getRequestedLevel() == null ? null : user.getRequestedLevel().name(),
-                    user.getAvatar(), Set.copyOf(user.getSkills()), user.getLastLoginAt(),
-                    user.getCreatedAt());
+                    user.getAvatar(), Set.copyOf(user.getSkills()), Set.copyOf(user.getInterests()),
+                    user.getTermsAcceptedAt(), user.getPrivacyAcceptedAt(), user.getEmailVerifiedAt(),
+                    user.getLastLoginAt(), user.getCreatedAt());
         }
     }
 
@@ -207,11 +214,65 @@ public final class Views {
                              int level2MinAssessment, int level2MinAttendance) {
     }
 
-    /** Aggregated progress used by the participant dashboard. */
+    /**
+     * Aggregated progress used by the participant dashboard. {@code overallScore} is the one
+     * weighted score (lessons, assessments, attendance) that decides the Level Two gate.
+     */
     public record ProgressView(int levelOnePercent, long completedLessons, long totalLessons,
                                int levelTwoPercent, boolean levelTwoUnlocked, boolean levelTwoEligible,
                                long milestonesCompleted, long milestonesTotal, int assessmentAverage,
                                int attendancePercent, boolean certificateEligible,
-                               PolicyView policy, Map<String, Integer> modulePercents) {
+                               PolicyView policy, Map<String, Integer> modulePercents,
+                               int overallScore, Map<String, Integer> careerPathScores) {
+    }
+
+    // ------------------------------------------------------------------ catalogue
+
+    public record AcademyView(Long id, String name, String slug, String tagline, String description,
+                              String icon, String colour, int sortOrder, boolean published,
+                              long careerPathCount, long courseCount) {
+    }
+
+    public record CourseView(Long id, Long careerPathId, String careerPathTitle, Long academyId,
+                             String academyName, String code, String title, String slug,
+                             String summary, String description, int level, int durationHours,
+                             String icon, long moduleCount, long lessonCount, boolean published,
+                             boolean enrolled) {
+    }
+
+    public record CareerPathView(Long id, Long academyId, String academyName, String title, String slug,
+                                 String summary, String description, String icon, int sortOrder,
+                                 boolean published, List<CourseView> courses) {
+    }
+
+    public record AcademyDetailView(AcademyView academy, List<CareerPathView> careerPaths) {
+    }
+
+    /** Course player: catalogue summary, this learner's progress, resume point and project link. */
+    public record CourseOutlineView(CourseView course, boolean enrolled, int percent,
+                                    long completedLessons, long totalLessons, int overallScore,
+                                    Long resumeLessonId, Long impactProjectId,
+                                    String impactProjectTitle, List<ModuleView> modules) {
+    }
+
+    /** Per-course progress row for the learner's dashboard and "My courses". */
+    public record CourseProgressView(Long courseId, String title, String slug, int level,
+                                     String status, int percent, long completedLessons,
+                                     long totalLessons, int overallScore) {
+    }
+
+    /** Path-scoped score, shown under the career path a learner is enrolled in. */
+    public record PathScoreView(Long careerPathId, String title, int percent, int overallScore) {
+    }
+
+    public record EnrollmentView(Long id, Long courseId, String courseTitle, String courseSlug,
+                                 String status, Instant enrolledAt, Instant completedAt) {
+
+        public static EnrollmentView of(ug.yep.entity.CourseEnrollment enrollment) {
+            return new EnrollmentView(enrollment.getId(), enrollment.getCourse().getId(),
+                    enrollment.getCourse().getTitle(), enrollment.getCourse().getSlug(),
+                    enrollment.getStatus().name(), enrollment.getEnrolledAt(),
+                    enrollment.getCompletedAt());
+        }
     }
 }

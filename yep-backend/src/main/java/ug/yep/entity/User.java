@@ -48,6 +48,9 @@ public abstract class User extends BaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     private Enums.UserStatus status;
 
+    @Column(name = "gender", length = 20)
+    private String gender;
+
     @Column(name = "country", length = 80)
     private String country;
 
@@ -63,6 +66,36 @@ public abstract class User extends BaseEntity {
     @Column(name = "field_of_study", length = 120)
     private String fieldOfStudy;
 
+    @Column(name = "education_level", length = 40)
+    private String educationLevel;
+
+    @Column(name = "employment_status", length = 40)
+    private String employmentStatus;
+
+    @Column(name = "career_goal", length = 240)
+    private String careerGoal;
+
+    @Column(name = "preferred_language", nullable = false, length = 8)
+    private String preferredLanguage = "en";
+
+    @Column(name = "terms_accepted_at")
+    private Instant termsAcceptedAt;
+
+    @Column(name = "privacy_accepted_at")
+    private Instant privacyAcceptedAt;
+
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
+
+    @Column(name = "guardian_name", length = 120)
+    private String guardianName;
+
+    @Column(name = "guardian_phone", length = 40)
+    private String guardianPhone;
+
+    @Column(name = "guardian_consent_at")
+    private Instant guardianConsentAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "requested_level", length = 20)
     private Enums.Level requestedLevel;
@@ -77,6 +110,11 @@ public abstract class User extends BaseEntity {
     @CollectionTable(name = "user_skills", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "name", nullable = false, length = 80)
     private Set<String> skills = new LinkedHashSet<>();
+
+    @ElementCollection
+    @CollectionTable(name = "user_interests", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "interest", nullable = false, length = 80)
+    private Set<String> interests = new LinkedHashSet<>();
 
     protected User() {
     }
@@ -175,6 +213,65 @@ public abstract class User extends BaseEntity {
         }
     }
 
+    /**
+     * Applies the profile fields captured by self-registration. Consent timestamps are
+     * set by the service only after the server has confirmed both boxes were ticked.
+     */
+    public void applyRegistration(String gender, String educationLevel, String employmentStatus,
+                                  String careerGoal, String preferredLanguage, Set<String> interests,
+                                  Instant termsAcceptedAt, Instant privacyAcceptedAt) {
+        this.gender = trimmed(gender);
+        this.educationLevel = trimmed(educationLevel);
+        this.employmentStatus = trimmed(employmentStatus);
+        this.careerGoal = trimmed(careerGoal);
+        if (preferredLanguage != null && !preferredLanguage.isBlank()) {
+            this.preferredLanguage = preferredLanguage.trim().toLowerCase(java.util.Locale.ROOT);
+        }
+        this.termsAcceptedAt = termsAcceptedAt;
+        this.privacyAcceptedAt = privacyAcceptedAt;
+        if (interests != null) {
+            this.interests.clear();
+            for (String interest : interests) {
+                if (interest != null && !interest.isBlank()) {
+                    this.interests.add(interest.trim());
+                }
+            }
+        }
+    }
+
+    /** Updates the extended profile fields without touching consent timestamps. */
+    public void updateExtendedProfile(String gender, String educationLevel, String employmentStatus,
+                                      String careerGoal, String preferredLanguage,
+                                      Set<String> interests) {
+        if (gender != null) {
+            this.gender = trimmed(gender);
+        }
+        if (educationLevel != null) {
+            this.educationLevel = trimmed(educationLevel);
+        }
+        if (employmentStatus != null) {
+            this.employmentStatus = trimmed(employmentStatus);
+        }
+        if (careerGoal != null) {
+            this.careerGoal = trimmed(careerGoal);
+        }
+        if (preferredLanguage != null && !preferredLanguage.isBlank()) {
+            this.preferredLanguage = preferredLanguage.trim().toLowerCase(java.util.Locale.ROOT);
+        }
+        if (interests != null) {
+            this.interests.clear();
+            for (String interest : interests) {
+                if (interest != null && !interest.isBlank()) {
+                    this.interests.add(interest.trim());
+                }
+            }
+        }
+    }
+
+    private static String trimmed(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
     public void addSkill(String skill) {
         if (skill != null && !skill.isBlank()) {
             skills.add(skill.trim());
@@ -247,5 +344,53 @@ public abstract class User extends BaseEntity {
 
     public Set<String> getSkills() {
         return skills;
+    }
+
+    public Set<String> getInterests() {
+        return interests;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public String getEducationLevel() {
+        return educationLevel;
+    }
+
+    public String getEmploymentStatus() {
+        return employmentStatus;
+    }
+
+    public String getCareerGoal() {
+        return careerGoal;
+    }
+
+    public String getPreferredLanguage() {
+        return preferredLanguage;
+    }
+
+    public Instant getTermsAcceptedAt() {
+        return termsAcceptedAt;
+    }
+
+    public Instant getPrivacyAcceptedAt() {
+        return privacyAcceptedAt;
+    }
+
+    public Instant getEmailVerifiedAt() {
+        return emailVerifiedAt;
+    }
+
+    public String getGuardianName() {
+        return guardianName;
+    }
+
+    public String getGuardianPhone() {
+        return guardianPhone;
+    }
+
+    public Instant getGuardianConsentAt() {
+        return guardianConsentAt;
     }
 }

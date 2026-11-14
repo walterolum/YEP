@@ -8,6 +8,23 @@ climate change and digital inclusion.
 
 The product is called **YouthRise** in the interface; YEP is the programme it serves.
 
+> **Current mission — use `yep-backend`, not the legacy `backend/` folder.**
+> The canonical system is the Spring Boot application in **`yep-backend/`** (package `ug.yep`,
+> database `yep`) with its static SPA in `yep-backend/src/main/resources/static`. The `backend/` and
+> React `src/` trees described later in this file are kept as the **design reference** for the redesign.
+> Phase 1 adds the academy → career path → course catalogue; Phase 2 adds course content
+> authoring, the course player and the single weighted overall score that gates Level Two. Quick start:
+>
+> ```bash
+> cd yep-backend
+> mvnw.cmd -o spring-boot:run        # Windows; ./mvnw on macOS/Linux
+> # then open http://localhost:8080
+> ```
+>
+> Flyway applies `V1..V8` on start. See [`docs/phase-1-runbook.md`](docs/phase-1-runbook.md),
+> [`docs/phase-1-api.md`](docs/phase-1-api.md), [`docs/phase-2-api.md`](docs/phase-2-api.md) and
+> [`docs/roles-and-permissions.md`](docs/roles-and-permissions.md).
+
 ---
 
 ## 1. What the system does

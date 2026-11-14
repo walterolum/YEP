@@ -1,8 +1,12 @@
 package ug.yep.service;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Period;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +56,11 @@ public class AuthService {
         if (request.dateOfBirth() == null) {
             throw new BusinessRuleException("Date of birth is required to confirm your age.");
         }
+        if (!Boolean.TRUE.equals(request.termsAccepted())
+                || !Boolean.TRUE.equals(request.privacyAccepted())) {
+            throw new BusinessRuleException(
+                    "Please accept the participation terms and the privacy notice to continue.");
+        }
         SettingsService.Policy policy = settings.policy();
         int age = Period.between(request.dateOfBirth(), LocalDate.now()).getYears();
         if (age < policy.minAge() || age > policy.maxAge()) {
@@ -62,6 +71,10 @@ public class AuthService {
                 request.phone(), passwordEncoder.encode(request.password()), Enums.UserStatus.PENDING);
         user.updateProfile(request.fullName(), request.phone(), request.country(), request.district(),
                 request.dateOfBirth(), request.institution(), request.fieldOfStudy());
+        Instant now = Instant.now();
+        user.applyRegistration(request.gender(), request.educationLevel(), request.employmentStatus(),
+                request.careerGoal(), language(request.preferredLanguage()), limited(request.interests()),
+                now, now);
         user.changeStatus(Enums.UserStatus.PENDING);
         User saved = users.save(user);
         audit.record(saved, "REGISTER", "user", saved.getId(), "Self-registration submitted");
@@ -105,6 +118,9 @@ public class AuthService {
         User user = require(userId);
         user.updateProfile(request.fullName(), request.phone(), request.country(), request.district(),
                 request.dateOfBirth(), request.institution(), request.fieldOfStudy());
+        user.updateExtendedProfile(request.gender(), request.educationLevel(),
+                request.employmentStatus(), request.careerGoal(), request.preferredLanguage(),
+                request.interests());
         if (request.skills() != null) {
             user.getSkills().clear();
             request.skills().stream().filter(skill -> skill != null && !skill.isBlank())
@@ -183,7 +199,14 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public List<Views.UserView> listUsers(String role, String status, String query) {
-        return users.search(blankToNull(role), blankToNull(status), blankToNull(query)).stream()
+        return listUsers(role, status, query, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Views.UserView> listUsers(String role, String status, String query,
+                                          String country, String educationLevel) {
+        return users.search(blankToNull(role), blankToNull(status), blankToNull(query),
+                        blankToNull(country), blankToNull(educationLevel)).stream()
                 .map(Views.UserView::of).toList();
     }
 
@@ -209,5 +232,27 @@ public class AuthService {
 
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    /** Only the four dictionaries the interface ships with are accepted. */
+    private static String language(String value) {
+        if (value == null || value.isBlank()) {
+            return "en";
+        }
+        String language = value.trim().toLowerCase(Locale.ROOT);
+        return Set.of("en", "sw", "lg", "rw").contains(language) ? language : "en";
+    }
+
+    private static Set<String> limited(Set<String> values) {
+        if (values == null) {
+            return Set.of();
+        }
+        Set<String> cleaned = new LinkedHashSet<>();
+        for (String value : values) {
+            if (value != null && !value.isBlank() && cleaned.size() < 12) {
+                cleaned.add(value.trim());
+            }
+        }
+        return cleaned;
     }
 }

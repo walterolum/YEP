@@ -18,6 +18,8 @@ public final class Enums {
 
     public enum LessonType { VIDEO, NOTES, ACTIVITY }
 
+    public enum CourseEnrollmentStatus { ENROLLED, COMPLETED, WITHDRAWN }
+
     public enum MaterialType { PDF, VIDEO, LINK, SLIDES }
 
     public enum DeliverableStatus { REVIEW, ACCEPTED, REVISE }

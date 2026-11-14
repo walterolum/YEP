@@ -44,6 +44,27 @@ public class Lesson extends BaseEntity {
         this.sortOrder = sortOrder;
     }
 
+    public Lesson(Module module, String title, Enums.LessonType type, int sortOrder,
+                  String content, int durationMinutes) {
+        this(module, title, type, sortOrder);
+        this.content = content;
+        this.durationMinutes = Math.max(0, durationMinutes);
+    }
+
+    /** Authoring update; the owning module is fixed once the lesson exists. */
+    public void update(String title, Enums.LessonType type, int sortOrder, String content,
+                       int durationMinutes) {
+        if (title != null && !title.isBlank()) {
+            this.title = title.trim();
+        }
+        if (type != null) {
+            this.type = type;
+        }
+        this.sortOrder = Math.max(0, sortOrder);
+        this.content = content;
+        this.durationMinutes = Math.max(0, durationMinutes);
+    }
+
     public Module getModule() {
         return module;
     }

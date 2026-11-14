@@ -97,10 +97,10 @@ const closeModal = () => $$('.modal').forEach((node) => node.remove());
 /* ============================================================= navigation */
 const NAV = {
   admin: [['dashboard', 'Dashboard', '▦'], ['participants', 'Users', '👥'], ['programmes', 'Programmes', '📚'],
-    ['exchange', 'Virtual Exchange', '🌍'], ['projects', 'Impact Projects', '🚀'], ['assessments', 'Assessments', '📝'],
+    ['academies', 'Academies', '🏫'], ['exchange', 'Virtual Exchange', '🌍'], ['projects', 'Impact Projects', '🚀'], ['assessments', 'Assessments', '📝'],
     ['certificates', 'Certificates', '🏅'], ['reports', 'Reports', '📈'], ['settings', 'Settings', '⚙️']],
   participant: [['dashboard', 'Dashboard', '▦'], ['profile', 'My Profile', '👤'], ['programmes', 'Programmes', '📚'],
-    ['learning', 'Learning Hub', '🎓'], ['projects', 'My Projects', '🚀'], ['sessions', 'Sessions & Events', '📅'],
+    ['academies', 'Academies', '🏫'], ['learning', 'Learning Hub', '🎓'], ['projects', 'My Projects', '🚀'], ['sessions', 'Sessions & Events', '📅'],
     ['assessments', 'Assessments', '📝'], ['certificates', 'Certificates', '🏅'], ['notifications', 'Notifications', '🔔']],
   mentor: [['dashboard', 'Dashboard', '▦'], ['mentees', 'My Mentees', '👥'], ['requests', 'Mentorship Requests', '📨'],
     ['sessions', 'Sessions', '📅'], ['resources', 'Resources', '📁'], ['reports', 'Reports', '📈']],
@@ -282,16 +282,32 @@ function signupScreen() {
         <label class="lbl">Full name<div class="fld"><input name="fullName" required placeholder="Your full name"></div></label>
         <label class="lbl">Email<div class="fld"><input name="email" type="email" required placeholder="you@example.com"></div></label>
         <label class="lbl">Phone<div class="fld"><input name="phone" placeholder="+256…"></div></label>
-        <label class="lbl">Date of birth<div class="fld"><input name="dateOfBirth" type="date" required></div></label>
+        <label class="lbl">Date of birth<div class="fld"><input name="dateOfBirth" type="date" required max="${new Date().getFullYear() - 18}-12-31"></div></label>
+        ${sel('Gender', 'gender', ['', 'Female', 'Male', 'Other', 'Prefer not to say'])}
         <label class="lbl">Country<div class="fld"><input name="country" value="Uganda"></div></label>
         <label class="lbl">District<div class="fld"><input name="district"></div></label>
+      </div>
+      <div class="fgrid">
         <label class="lbl">Institution<div class="fld"><input name="institution"></div></label>
         <label class="lbl">Field of study<div class="fld"><input name="fieldOfStudy"></div></label>
+        ${sel('Education level', 'educationLevel', ['', 'Primary', 'Secondary', 'Certificate', 'Diploma', 'University', 'Postgraduate'])}
+        ${sel('Employment status', 'employmentStatus', ['', 'Unemployed', 'Self-employed', 'Employed', 'Student', 'Looking for work'])}
       </div>
+      <label class="lbl">Career goal<div class="fld"><input name="careerGoal" placeholder="e.g. Become a front-end developer"></div></label>
+      ${sel('Preferred language', 'preferredLanguage', [{ value: 'en', label: 'English' }, { value: 'sw', label: 'Kiswahili' },
+        { value: 'lg', label: 'Luganda' }, { value: 'rw', label: 'Kinyarwanda' }], getLanguage())}
+      <div class="lbl">Interests<div class="chips" style="margin-top:6px">
+        ${['Technology', 'Business', 'Health', 'Creative arts', 'Agriculture', 'Climate', 'Education', 'Civic engagement']
+          .map((interest) => `<label class="chip"><input type="checkbox" name="interests" value="${esc(interest)}"> ${esc(interest)}</label>`).join('')}
+      </div></div>
       <div class="fgrid">
         <label class="lbl">Password<div class="fld"><input name="password" type="password" required minlength="8"></div></label>
         <label class="lbl">Confirm password<div class="fld"><input name="confirmPassword" type="password" required minlength="8"></div></label>
       </div>
+      <label class="row" style="justify-content:flex-start;gap:8px">
+        <input type="checkbox" name="termsAccepted" required> I accept the participation terms</label>
+      <label class="row" style="justify-content:flex-start;gap:8px">
+        <input type="checkbox" name="privacyAccepted" required> I have read the privacy notice</label>
       <div class="err" data-err></div>
       <button class="btn y full" type="submit">Create Account</button>
       <div class="ctr">Already registered? <a class="lnk" href="#/login">Sign in</a></div>
@@ -302,10 +318,17 @@ function signupScreen() {
     const form = event.target;
     const button = form.querySelector('button[type=submit]');
     busy(button, true);
+    const v = vals(form);
+    const payload = {
+      ...v,
+      interests: $$('input[name="interests"]:checked', form).map((box) => box.value),
+      termsAccepted: v.termsAccepted === 'on',
+      privacyAccepted: v.privacyAccepted === 'on',
+    };
     try {
-      const result = await api.post('/auth/signup', vals(form));
+      const result = await api.post('/auth/signup', payload);
       form.querySelector('[data-err]').style.color = 'var(--ok)';
-      form.querySelector('[data-err]').textContent = result.message;
+      form.querySelector('[data-err]').textContent = 'Application received. An administrator will review your account.';
       form.reset();
     } catch (error) {
       form.querySelector('[data-err]').style.color = 'var(--bad)';
@@ -342,18 +365,27 @@ const USER_ROLES = [
 
 PAGES.admin.participants = async (page) => {
   const role = state.userRole || '';
+  const filters = new URLSearchParams();
+  if (role) filters.set('role', role);
+  if (state.userCountry) filters.set('country', state.userCountry);
+  if (state.userEducation) filters.set('education', state.userEducation);
   const [users, allUsers] = await Promise.all([
-    api.get(role ? `/admin/users?role=${role}` : '/admin/users'),
+    api.get(`/admin/users${filters.toString() ? '?' + filters.toString() : ''}`),
     api.get('/admin/users'),
   ]);
   const counts = allUsers.reduce((map, user) => ({ ...map, [user.role]: (map[user.role] || 0) + 1 }), {});
+  const distinct = (key) => [...new Set(allUsers.map((user) => user[key]).filter(Boolean))].sort();
   page.innerHTML = head('User management', 'Create accounts and approve, suspend or reject any user',
     '<button class="btn sm" data-new>+ Create user</button>') +
     `<section class="card"><div class="tabs role-tabs">${USER_ROLES.map((tab) => `<button class="${tab.value === role ? 'on' : ''}"
       data-role="${tab.value}">${esc(t(tab.label))}${tab.value ? `<span class="tag">${counts[tab.value] || 0}</span>` : ''}</button>`).join('')}</div>
-    ${table(['Name', 'Role', 'Email', 'District', 'Status', 'Joined', 'Actions'], users.map((u) => [
-      `<strong>${esc(u.fullName)}</strong>`, `<span class="tag Review">${esc(u.role)}</span>`, esc(u.email),
-      esc(u.district || '—'), tag(u.status), d(u.createdAt),
+    <div class="fgrid" style="margin-bottom:12px">
+      ${sel('Country', 'countryFilter', [{ value: '', label: 'All countries' }, ...distinct('country')], state.userCountry || '')}
+      ${sel('Education level', 'educationFilter', [{ value: '', label: 'All education levels' }, ...distinct('educationLevel')], state.userEducation || '')}
+    </div>
+    ${table(['Name', 'Role', 'Country', 'Education', 'District', 'Status', 'Joined', 'Actions'], users.map((u) => [
+      `<strong>${esc(u.fullName)}</strong>`, `<span class="tag Review">${esc(u.role)}</span>`,
+      esc(u.country || '—'), esc(u.educationLevel || '—'), esc(u.district || '—'), tag(u.status), d(u.createdAt),
       `<span class="pgh">${u.status !== 'APPROVED' ? `<button class="btn ok sm" data-status="${u.id}" data-next="APPROVED">Approve</button>` : ''}
         ${u.status === 'APPROVED' ? `<button class="btn ghost sm" data-status="${u.id}" data-next="SUSPENDED">Suspend</button>` : ''}
         ${u.status !== 'REJECTED' ? `<button class="btn bad sm" data-status="${u.id}" data-next="REJECTED">Reject</button>` : ''}</span>`,
@@ -363,6 +395,14 @@ PAGES.admin.participants = async (page) => {
     state.userRole = button.dataset.role;
     go('participants');
   }));
+  $('select[name="countryFilter"]').addEventListener('change', (event) => {
+    state.userCountry = event.target.value;
+    go('participants');
+  });
+  $('select[name="educationFilter"]').addEventListener('change', (event) => {
+    state.userEducation = event.target.value;
+    go('participants');
+  });
 
   const decide = async (id, next) => {
     try { await api.put(`/admin/users/${id}/status`, { status: next }); toast('Account updated.'); go('participants'); }
@@ -432,6 +472,251 @@ PAGES.admin.programmes = async (page) => {
       } catch (error) { toast(error.message); }
     });
   });
+};
+
+PAGES.admin.academies = async (page) => {
+  const [tree, allCourses] = await Promise.all([api.get('/admin/catalogue'), api.get('/admin/courses')]);
+  const paths = tree.flatMap((entry) => entry.careerPaths);
+  const pathOptions = paths.map((path) => ({ value: path.id, label: `${path.academyName} · ${path.title}` }));
+
+  page.innerHTML = head('Academies', 'Create academy groups, career paths and courses — no code changes needed',
+    '<button class="btn sm" data-new-academy>+ New academy</button><button class="btn ghost sm" data-new-path>+ Career path</button><button class="btn ghost sm" data-new-course>+ Course</button>') +
+    `<div class="cards">${tree.map((entry) => {
+      const academy = entry.academy;
+      return `<article class="card pc">
+        <div class="im" style="${academy.colour ? `background:linear-gradient(135deg,${esc(academy.colour)},var(--navy))` : ''}">${esc(academy.icon || '🏫')}</div>
+        <h3 style="margin:0">${esc(academy.name)} ${tag(academy.published ? 'Published' : 'Draft')}</h3>
+        <small style="color:var(--mut)">${esc(academy.tagline || academy.slug)}</small>
+        <div class="meta"><span>${academy.careerPathCount} career path(s)</span><span>${academy.courseCount} course(s)</span></div>
+        <div class="pgh">
+          <button class="btn ghost sm" data-edit-academy="${academy.id}">Edit</button>
+          <button class="btn ghost sm" data-publish-academy="${academy.id}">${academy.published ? 'Unpublish' : 'Publish'}</button>
+          <button class="btn sm" data-add-path="${academy.id}">+ Career path</button>
+        </div>
+        <div style="display:grid;gap:8px;margin-top:6px">${entry.careerPaths.length ? entry.careerPaths.map((path) => `<div class="act">
+          <div class="ic c2">${esc(path.icon || '🧭')}</div>
+          <div class="grow"><b>${esc(path.title)}</b><small>${path.courses.length} course(s) · ${path.published ? 'published' : 'draft'}</small></div>
+          <button class="btn ghost sm" data-edit-path="${path.id}">Edit</button>
+        </div>`).join('') : `<small style="color:var(--mut)">No career paths yet.</small>`}</div>
+      </article>`;
+    }).join('') || empty('No academies yet. Create the first one.')}</div>` +
+    card('All courses', table(['Course', 'Career path', 'Level', 'Modules', 'Status', 'Actions'], allCourses.map((course) => [
+      `<strong>${esc(course.title)}</strong><br><small style="color:var(--mut)">${esc(course.code)}</small>`,
+      esc(course.careerPathTitle), `Level ${course.level}`, String(course.moduleCount),
+      tag(course.published ? 'Published' : 'Draft'),
+      `<span class="pgh"><button class="btn ghost sm" data-edit-course="${course.id}">Edit</button>
+        <button class="btn ghost sm" data-course-content="${course.id}">Content</button>
+        <button class="btn ghost sm" data-publish-course="${course.id}">${course.published ? 'Unpublish' : 'Publish'}</button></span>`,
+    ])));
+
+  const academyById = new Map(tree.map((entry) => [entry.academy.id, entry.academy]));
+  const pathById = new Map(paths.map((path) => [path.id, path]));
+  const courseById = new Map(allCourses.map((course) => [course.id, course]));
+
+  $$('[data-new-academy]').forEach((b) => b.addEventListener('click', () => academyForm()));
+  $$('[data-edit-academy]').forEach((b) => b.addEventListener('click', () => academyForm(academyById.get(Number(b.dataset.editAcademy)))));
+  $$('[data-new-path]').forEach((b) => b.addEventListener('click', () => pathForm()));
+  $$('[data-add-path]').forEach((b) => b.addEventListener('click', () => pathForm(null, Number(b.dataset.addPath))));
+  $$('[data-edit-path]').forEach((b) => b.addEventListener('click', () => pathForm(pathById.get(Number(b.dataset.editPath)))));
+  $$('[data-new-course]').forEach((b) => b.addEventListener('click', () => courseForm(null, pathOptions)));
+  $$('[data-edit-course]').forEach((b) => b.addEventListener('click', () => courseForm(courseById.get(Number(b.dataset.editCourse)), pathOptions)));
+  $$('[data-course-content]').forEach((b) => b.addEventListener('click', () => {
+    state.adminCourseId = Number(b.dataset.courseContent);
+    go('courseContent');
+  }));
+
+  $$('[data-publish-academy]').forEach((b) => b.addEventListener('click', () => {
+    const academy = academyById.get(Number(b.dataset.publishAcademy));
+    publish('academies', academy.id, !academy.published);
+  }));
+  $$('[data-publish-course]').forEach((b) => b.addEventListener('click', () => {
+    const course = courseById.get(Number(b.dataset.publishCourse));
+    publish('courses', course.id, !course.published);
+  }));
+
+  function academyForm(academy) {
+    modal(`<h3>${academy ? 'Edit academy' : 'New academy'}</h3><form id="academyForm">
+      ${fld('Name', 'name', { required: true, value: academy?.name || '' })}
+      ${fld('Tagline', 'tagline', { value: academy?.tagline || '', placeholder: 'One line that describes it' })}
+      ${txt('Description', 'description', { value: academy?.description || '' })}
+      <div class="fgrid">${fld('Icon', 'icon', { value: academy?.icon || '🏫' })}
+        ${fld('Colour', 'colour', { value: academy?.colour || '#1d4ed8', placeholder: '#1d4ed8' })}
+        ${fld('Sort order', 'sortOrder', { type: 'number', min: 0, value: academy?.sortOrder ?? 0 })}</div>
+      <label class="row"><span>Published</span><input type="checkbox" name="published" ${!academy || academy.published ? 'checked' : ''}></label>
+      <div class="pgh"><button class="btn" type="submit">${academy ? 'Save changes' : 'Create academy'}</button>
+        <button class="btn ghost" type="button" data-close>Cancel</button></div></form>`);
+    $('[data-close]').addEventListener('click', closeModal);
+    $('#academyForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const v = vals(event.target);
+      const payload = { name: v.name, tagline: v.tagline, description: v.description, icon: v.icon,
+        colour: v.colour, sortOrder: Number(v.sortOrder || 0), published: v.published === 'on' };
+      try {
+        if (academy) await api.put(`/admin/academies/${academy.id}`, payload);
+        else await api.post('/admin/academies', payload);
+        closeModal(); toast(academy ? 'Academy updated.' : 'Academy created.'); go('academies');
+      } catch (error) { toast(error.message); }
+    });
+  }
+
+  function pathForm(path, presetAcademyId) {
+    const academyId = path?.academyId || presetAcademyId || tree[0]?.academy.id;
+    if (!academyId) { toast('Create an academy first.'); return; }
+    modal(`<h3>${path ? 'Edit career path' : 'New career path'}</h3><form id="pathForm">
+      ${sel('Academy', 'academyId', tree.map((entry) => ({ value: entry.academy.id, label: entry.academy.name })), academyId)}
+      ${fld('Title', 'title', { required: true, value: path?.title || '' })}
+      ${fld('Summary', 'summary', { value: path?.summary || '' })}
+      ${txt('Description', 'description', { value: path?.description || '' })}
+      <div class="fgrid">${fld('Icon', 'icon', { value: path?.icon || '🧭' })}
+        ${fld('Sort order', 'sortOrder', { type: 'number', min: 0, value: path?.sortOrder ?? 0 })}</div>
+      <label class="row"><span>Published</span><input type="checkbox" name="published" ${!path || path.published ? 'checked' : ''}></label>
+      <div class="pgh"><button class="btn" type="submit">${path ? 'Save changes' : 'Create career path'}</button>
+        <button class="btn ghost" type="button" data-close>Cancel</button></div></form>`);
+    $('[data-close]').addEventListener('click', closeModal);
+    $('#pathForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const v = vals(event.target);
+      const payload = { academyId: Number(v.academyId), title: v.title, summary: v.summary,
+        description: v.description, icon: v.icon, sortOrder: Number(v.sortOrder || 0),
+        published: v.published === 'on' };
+      try {
+        if (path) await api.put(`/admin/career-paths/${path.id}`, payload);
+        else await api.post('/admin/career-paths', payload);
+        closeModal(); toast(path ? 'Career path updated.' : 'Career path created.'); go('academies');
+      } catch (error) { toast(error.message); }
+    });
+  }
+
+  function courseForm(course, options) {
+    if (!options.length) { toast('Create a career path first.'); return; }
+    const careerPathId = course?.careerPathId || options[0].value;
+    modal(`<h3>${course ? 'Edit course' : 'New course'}</h3><form id="courseForm">
+      ${sel('Career path', 'careerPathId', options, careerPathId)}
+      <div class="fgrid">${fld('Code', 'code', { required: true, value: course?.code || '' , placeholder: 'TECH-WEB-L1' })}
+        ${fld('Title', 'title', { required: true, value: course?.title || '' })}</div>
+      ${fld('Summary', 'summary', { value: course?.summary || '' })}
+      ${txt('Description', 'description', { value: course?.description || '' })}
+      <div class="fgrid">${sel('Level', 'level', [{ value: 1, label: 'Level One' }, { value: 2, label: 'Level Two' }], course?.level || 1)}
+        ${fld('Duration (hours)', 'durationHours', { type: 'number', min: 0, value: course?.durationHours ?? 20 })}
+        ${fld('Icon', 'icon', { value: course?.icon || '📘' })}
+        ${fld('Sort order', 'sortOrder', { type: 'number', min: 0, value: course?.sortOrder ?? 0 })}</div>
+      <label class="row"><span>Published</span><input type="checkbox" name="published" ${!course || course.published ? 'checked' : ''}></label>
+      <div class="pgh"><button class="btn" type="submit">${course ? 'Save changes' : 'Create course'}</button>
+        <button class="btn ghost" type="button" data-close>Cancel</button></div></form>`);
+    $('[data-close]').addEventListener('click', closeModal);
+    $('#courseForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const v = vals(event.target);
+      const payload = { careerPathId: Number(v.careerPathId), code: v.code, title: v.title,
+        summary: v.summary, description: v.description, level: Number(v.level),
+        durationHours: Number(v.durationHours || 0), icon: v.icon,
+        sortOrder: Number(v.sortOrder || 0), published: v.published === 'on' };
+      try {
+        if (course) await api.put(`/admin/courses/${course.id}`, payload);
+        else await api.post('/admin/courses', payload);
+        closeModal(); toast(course ? 'Course updated.' : 'Course created.'); go('academies');
+      } catch (error) { toast(error.message); }
+    });
+  }
+
+  async function publish(kind, id, published) {
+    try {
+      await api.put(`/admin/${kind}/${id}/publish?published=${published}`, {});
+      toast('Visibility updated.'); go('academies');
+    } catch (error) { toast(error.message); }
+  }
+};
+
+/* Admin: course content authoring — modules and lessons are data, not code. */
+PAGES.admin.courseContent = async (page) => {
+  const courseId = state.adminCourseId;
+  if (!courseId) { go('academies'); return; }
+  const outline = await api.get(`/content/courses/${courseId}/outline`);
+  const course = outline.course;
+
+  page.innerHTML = head(`${course.title} — content`,
+    `${course.code} · ${outline.modules.length} module(s) · ${course.published ? 'published' : 'draft'}`,
+    '<button class="btn ghost sm" data-back>← All courses</button><button class="btn sm" data-new-module>+ Module</button>') +
+    (outline.modules.length ? outline.modules.map((module) => `<section class="card">
+      <h3 style="margin-bottom:6px">${esc(module.icon || '📘')} ${esc(module.name)}</h3>
+      <div class="pgh" style="margin-bottom:8px">
+        <button class="btn ghost sm" data-edit-module="${module.id}">Edit module</button>
+        <button class="btn ghost sm" data-delete-module="${module.id}">Delete module</button>
+        <button class="btn sm" data-add-lesson="${module.id}">+ Lesson</button></div>
+      ${module.lessons.length ? table(['Lesson', 'Type', 'Minutes', 'Actions'], module.lessons.map((lesson) => [
+        `<strong>${esc(lesson.title)}</strong>`, esc(lesson.type), String(lesson.durationMinutes),
+        `<span class="pgh"><button class="btn ghost sm" data-edit-lesson="${lesson.id}" data-module="${module.id}">Edit</button>
+          <button class="btn ghost sm" data-delete-lesson="${lesson.id}">Delete</button></span>`]), false)
+        : empty('No lessons in this module yet.')}
+    </section>`).join('') : `<div class="card">${empty('No modules yet. Add the first module.')}</div>`);
+
+  const moduleById = new Map(outline.modules.map((module) => [module.id, module]));
+  $('[data-back]').addEventListener('click', () => go('academies'));
+  $$('[data-new-module]').forEach((b) => b.addEventListener('click', () => moduleForm()));
+  $$('[data-edit-module]').forEach((b) => b.addEventListener('click', () => moduleForm(moduleById.get(Number(b.dataset.editModule)))));
+  $$('[data-add-lesson]').forEach((b) => b.addEventListener('click', () => lessonForm(Number(b.dataset.addLesson))));
+  $$('[data-edit-lesson]').forEach((b) => b.addEventListener('click', async () => {
+    try {
+      const lesson = await api.get(`/learning/lessons/${b.dataset.editLesson}`);
+      lessonForm(Number(b.dataset.module), lesson);
+    } catch (error) { toast(error.message); }
+  }));
+  $$('[data-delete-module]').forEach((b) => b.addEventListener('click', async () => {
+    if (!confirm('Delete this module? Modules with lessons are protected.')) return;
+    try { await api.del(`/content/modules/${b.dataset.deleteModule}`); toast('Module deleted.'); go('courseContent'); }
+    catch (error) { toast(error.message); }
+  }));
+  $$('[data-delete-lesson]').forEach((b) => b.addEventListener('click', async () => {
+    if (!confirm('Delete this lesson? Completed lessons are protected.')) return;
+    try { await api.del(`/content/lessons/${b.dataset.deleteLesson}`); toast('Lesson deleted.'); go('courseContent'); }
+    catch (error) { toast(error.message); }
+  }));
+
+  function moduleForm(module) {
+    modal(`<h3>${module ? 'Edit module' : 'New module'}</h3><form id="moduleForm">
+      ${fld('Name', 'name', { required: true, value: module?.name || '' })}
+      <div class="fgrid">${fld('Icon', 'icon', { value: module?.icon || '📘' })}
+        ${fld('Sort order', 'sortOrder', { type: 'number', min: 0, value: module?.sortOrder ?? 0 })}</div>
+      ${txt('Outcome', 'outcome', { value: module?.outcome || '' })}
+      ${sel('Level', 'level', [{ value: 1, label: 'Level One' }, { value: 2, label: 'Level Two' }], module?.level || course.level)}
+      <div class="pgh"><button class="btn" type="submit">${module ? 'Save module' : 'Create module'}</button>
+        <button class="btn ghost" type="button" data-close>Cancel</button></div></form>`);
+    $('[data-close]').addEventListener('click', closeModal);
+    $('#moduleForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const v = vals(event.target);
+      const payload = { name: v.name, icon: v.icon, outcome: v.outcome,
+        sortOrder: Number(v.sortOrder || 0), level: Number(v.level) };
+      try {
+        if (module) await api.put(`/content/modules/${module.id}`, payload);
+        else await api.post(`/content/courses/${courseId}/modules`, payload);
+        closeModal(); toast(module ? 'Module updated.' : 'Module created.'); go('courseContent');
+      } catch (error) { toast(error.message); }
+    });
+  }
+
+  function lessonForm(moduleId, lesson) {
+    modal(`<h3>${lesson ? 'Edit lesson' : 'New lesson'}</h3><form id="lessonForm">
+      ${fld('Title', 'title', { required: true, value: lesson?.title || '' })}
+      <div class="fgrid">${sel('Type', 'type', ['VIDEO', 'NOTES', 'ACTIVITY'], lesson?.type || 'NOTES')}
+        ${fld('Minutes', 'durationMinutes', { type: 'number', min: 0, value: lesson?.durationMinutes ?? 10 })}
+        ${fld('Sort order', 'sortOrder', { type: 'number', min: 0, value: lesson?.sortOrder ?? 0 })}</div>
+      ${txt('Content', 'content', { value: lesson?.content || '', placeholder: 'Lesson notes, transcript or activity brief' })}
+      <div class="pgh"><button class="btn" type="submit">${lesson ? 'Save lesson' : 'Create lesson'}</button>
+        <button class="btn ghost" type="button" data-close>Cancel</button></div></form>`);
+    $('[data-close]').addEventListener('click', closeModal);
+    $('#lessonForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const v = vals(event.target);
+      const payload = { title: v.title, type: v.type, sortOrder: Number(v.sortOrder || 0),
+        durationMinutes: Number(v.durationMinutes || 0), content: v.content };
+      try {
+        if (lesson) await api.put(`/content/lessons/${lesson.id}`, payload);
+        else await api.post(`/content/modules/${moduleId}/lessons`, payload);
+        closeModal(); toast(lesson ? 'Lesson updated.' : 'Lesson created.'); go('courseContent');
+      } catch (error) { toast(error.message); }
+    });
+  }
 };
 
 PAGES.admin.exchange = async (page) => {
@@ -712,9 +997,10 @@ PAGES.participant.dashboard = async (page) => {
   page.innerHTML = hero(`Hello, ${firstName(dash.user?.fullName)} 👋`, 'Keep learning, grow your skills, and make an impact.',
     '<button class="btn y" data-goto="programmes">Explore Programmes →</button>', '🎓') +
     `<div class="g g2">
-      <div class="card"><h3>My Learning Progress</h3><div class="don">${donut(pct(p.levelOnePercent))}
-        <div><div class="on-t">${pct(p.levelOnePercent) >= 80 ? 'On Track' : 'In Progress'}</div>
-        <p style="color:var(--mut);margin:2px 0 10px">${p.levelTwoUnlocked ? 'Level Two unlocked' : 'Reach 80% of Level One to unlock Level Two'}</p>
+      <div class="card"><h3>My Learning Progress</h3><div class="don">${donut(p.overallScore || 0)}
+        <div><div class="on-t">${(p.overallScore || 0) >= 80 ? 'On Track' : 'In Progress'}</div>
+        <p style="color:var(--mut);margin:2px 0 6px">Overall score <b>${p.overallScore || 0}%</b> · lessons ${pct(p.levelOnePercent)}% · assessments ${p.assessmentAverage || 0}% · attendance ${p.attendancePercent || 0}%</p>
+        <p style="color:var(--mut);margin:0 0 10px">${p.levelTwoUnlocked ? 'Level Two unlocked' : 'Reach an overall score of 80% to unlock Level Two'}</p>
         <button class="btn ghost sm" data-goto="learning">View Details →</button></div></div></div>
       <div class="card"><h3>Upcoming Session</h3>${next ? `<div class="act"><div class="ic cal">📅</div>
         <div class="grow"><b>${esc(next.title)}</b><small>${dt(next.startsAt)} · ${esc(next.type)}</small></div></div>
@@ -762,6 +1048,13 @@ PAGES.participant.profile = async (page) => {
         ${fld('Date of birth', 'dateOfBirth', { type: 'date', value: me.dateOfBirth || '' })}
         ${fld('Institution', 'institution', { value: me.institution || '' })}
         ${fld('Field of study', 'fieldOfStudy', { value: me.fieldOfStudy || '' })}
+        ${sel('Gender', 'gender', ['', 'Female', 'Male', 'Other', 'Prefer not to say'], me.gender || '')}
+        ${sel('Education level', 'educationLevel', ['', 'Primary', 'Secondary', 'Certificate', 'Diploma', 'University', 'Postgraduate'], me.educationLevel || '')}
+        ${sel('Employment status', 'employmentStatus', ['', 'Unemployed', 'Self-employed', 'Employed', 'Student', 'Looking for work'], me.employmentStatus || '')}
+        ${sel('Preferred language', 'preferredLanguage', [{ value: 'en', label: 'English' }, { value: 'sw', label: 'Kiswahili' },
+          { value: 'lg', label: 'Luganda' }, { value: 'rw', label: 'Kinyarwanda' }], me.preferredLanguage || 'en')}
+        ${fld('Career goal', 'careerGoal', { value: me.careerGoal || '' })}
+        ${fld('Interests (comma separated)', 'interests', { value: (me.interests || []).join(', ') })}
         ${fld('Skills (comma separated)', 'skills', { value: (me.skills || []).join(', ') })}
         <div class="pgh" style="grid-column:1/-1"><button class="btn" type="submit">Save changes</button></div>
       </form></div>
@@ -779,6 +1072,7 @@ PAGES.participant.profile = async (page) => {
     const v = vals(event.target);
     try {
       const updated = await api.put('/auth/profile', { ...v, dateOfBirth: v.dateOfBirth || null,
+        interests: v.interests ? v.interests.split(',').map((s) => s.trim()).filter(Boolean) : [],
         skills: v.skills ? v.skills.split(',').map((s) => s.trim()).filter(Boolean) : [] });
       session.setUser(updated); toast('Profile saved.');
     } catch (error) { toast(error.message); }
@@ -812,6 +1106,133 @@ PAGES.participant.programmes = async (page) => {
   }));
 };
 
+PAGES.participant.academies = async (page) => {
+  const [academies, mine] = await Promise.all([
+    api.get('/academies'), api.get('/me/enrollments').catch(() => []),
+  ]);
+  page.innerHTML = head('Academies', 'Choose an academy, explore its career paths and enrol in a course') +
+    hero('Six academies, one journey', 'Every academy has career paths that start at Level One and unlock Level Two at 80%.',
+      '<button class="btn y sm" data-goto="learning">Go to Learning Hub →</button>', '🏫') +
+    `<div class="cards">${academies.map((academy) => `<article class="card pc">
+      <div class="im" style="${academy.colour ? `background:linear-gradient(135deg,${esc(academy.colour)},var(--navy))` : ''}">${esc(academy.icon || '🏫')}</div>
+      <h3 style="margin:0">${esc(academy.name)}</h3>
+      ${academy.tagline ? `<small style="color:var(--mut)">${esc(academy.tagline)}</small>` : ''}
+      <div class="meta"><span>${academy.careerPathCount} career path(s)</span><span>${academy.courseCount} course(s)</span></div>
+      <button class="btn sm" data-academy="${esc(academy.slug)}">Explore academy →</button>
+    </article>`).join('') || empty('No academies have been published yet.')}</div>` +
+    card('My courses', table(['Course', 'Enrolled', 'Status'], mine.map((enrollment) => [
+      esc(enrollment.courseTitle), d(enrollment.enrolledAt), tag(enrollment.status)])));
+
+  $$('[data-academy]').forEach((button) => button.addEventListener('click', async () => {
+    busy(button, true);
+    try { await academyDetail(page, button.dataset.academy); } catch (error) { toast(error.message); busy(button, false); }
+  }));
+};
+
+async function academyDetail(page, slug) {
+  const detail = await api.get(`/academies/${encodeURIComponent(slug)}`);
+  const academy = detail.academy;
+  page.innerHTML = head(academy.name, academy.tagline || 'Career paths and courses in this academy',
+    '<button class="btn ghost sm" data-back>← All academies</button>') +
+    (academy.description ? `<div class="card"><p style="margin:0">${esc(academy.description)}</p></div>` : '') +
+    (detail.careerPaths.length ? detail.careerPaths.map((path) => `<section class="card">
+      <h3>${esc(path.icon || '🧭')} ${esc(path.title)}</h3>
+      ${path.summary ? `<p style="color:var(--mut);margin:-6px 0 12px">${esc(path.summary)}</p>` : ''}
+      <div class="cards">${path.courses.map((course) => `<article class="card pc" style="box-shadow:none">
+        <div class="im" style="height:64px;font-size:28px">${esc(course.icon || '📘')}</div>
+        <b>${esc(course.title)}</b><small style="color:var(--mut)">${esc(course.code)} · Level ${course.level}</small>
+        <div class="meta"><span>${course.moduleCount} module(s)</span><span>${course.lessonCount} lesson(s)</span>
+          <span>${course.durationHours}h</span></div>
+        ${course.enrolled ? `<button class="btn sm" data-open-course="${esc(course.slug)}">Open course →</button>`
+          : `<button class="btn sm" data-enrol="${course.id}">Enrol</button>`}
+      </article>`).join('') || empty('Courses are being prepared for this career path.')}</div>
+    </section>`).join('') : empty('No career paths are published in this academy yet.'));
+
+  const back = $('[data-back]');
+  if (back) back.addEventListener('click', () => go('academies'));
+  $$('[data-open-course]').forEach((button) => button.addEventListener('click', () => {
+    state.courseSlug = button.dataset.openCourse;
+    go('course');
+  }));
+  $$('[data-enrol]').forEach((button) => button.addEventListener('click', async () => {
+    busy(button, true);
+    try {
+      const enrollment = await api.post(`/courses/${button.dataset.enrol}/enrol`);
+      toast('You are enrolled.');
+      state.courseSlug = enrollment.courseSlug;
+      go('course');
+    } catch (error) { toast(error.message); busy(button, false); }
+  }));
+}
+
+/* Course player: outline, resume point, lesson reader and completion. */
+PAGES.participant.course = async (page) => {
+  const outline = await api.get(`/courses/${encodeURIComponent(state.courseSlug)}/outline`);
+  const course = outline.course;
+  const lessons = outline.modules.flatMap((module) => module.lessons);
+  const resume = outline.resumeLessonId || lessons.find((lesson) => !lesson.completed)?.id || lessons[0]?.id;
+
+  page.innerHTML = head(course.title, `${course.academyName} · ${course.careerPathTitle} · Level ${course.level}`,
+    '<button class="btn ghost sm" data-back>← Back to academy</button>') +
+    `<div class="g g2">
+      <div class="card"><h3>Your progress</h3><div class="don">${donut(outline.percent)}
+        <div><div class="on-t">${outline.completedLessons}/${outline.totalLessons} lessons</div>
+          <p style="color:var(--mut);margin:2px 0 10px">Overall score ${outline.overallScore}% · ${course.durationHours}h course</p>
+          ${resume ? `<button class="btn sm" data-lesson="${resume}">${outline.completedLessons ? 'Resume' : 'Start'} →</button>` : ''}
+        </div></div></div>
+      <div class="card"><h3>Course</h3>
+        ${course.summary ? `<p style="color:var(--mut);margin-top:0">${esc(course.summary)}</p>` : ''}
+        ${outline.enrolled ? tag('Registered', 'Enrolled') : `<button class="btn" data-enrol-course="${course.id}">Enrol in this course</button>`}
+        ${outline.impactProjectId ? `<div class="act" style="margin-top:12px"><div class="ic c1">🚀</div>
+          <div class="grow"><b>${esc(outline.impactProjectTitle)}</b><small>Your Level Two impact project</small></div>
+          <button class="btn ghost sm" data-goto="projects">Open</button></div>` : ''}
+      </div>
+    </div>` +
+    outline.modules.map((module) => `<section class="card">
+      <h3>${esc(module.icon || '📘')} ${esc(module.name)} <span>${module.percent}%</span></h3>
+      ${module.outcome ? `<p style="color:var(--mut);font-size:13px;margin-bottom:8px">${esc(module.outcome)}</p>` : ''}
+      ${bar(module.percent)}
+      <div class="lsn" style="margin-top:8px">${module.lessons.map((lesson) => `<label>
+        <span>${lesson.completed ? '✅' : '⬜'}</span>
+        <span class="grow"><b>${esc(lesson.title)}</b><small style="display:block;color:var(--mut)">${esc(lesson.type)} · ${lesson.durationMinutes} min</small></span>
+        <button class="btn ghost sm" data-lesson="${lesson.id}">${lesson.completed ? 'Review' : 'Open'}</button>
+      </label>`).join('') || empty('Lessons are being prepared.')}</div>
+    </section>`).join('') || empty('This course has no lessons yet.');
+
+  $('[data-back]').addEventListener('click', () => go('academies'));
+  $$('[data-goto]').forEach((button) => button.addEventListener('click', () => go(button.dataset.goto)));
+  $$('[data-lesson]').forEach((button) => button.addEventListener('click', () => openLesson(button.dataset.lesson)));
+  const enrol = $('[data-enrol-course]');
+  if (enrol) enrol.addEventListener('click', async () => {
+    busy(enrol, true);
+    try { await api.post(`/courses/${enrol.dataset.enrolCourse}/enrol`); toast('You are enrolled.'); go('course'); }
+    catch (error) { toast(error.message); busy(enrol, false); }
+  });
+
+  async function openLesson(lessonId) {
+    try {
+      const lesson = await api.get(`/learning/lessons/${lessonId}`);
+      modal(`<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+          <div><h3 style="margin:0">${esc(lesson.title)}</h3>
+          <small style="color:var(--mut)">${esc(lesson.moduleName)} · ${esc(lesson.type)} · ${lesson.durationMinutes} min</small></div>
+          <button class="btn ghost sm" data-close>Close</button></div>
+        <div class="lesson-body">${esc(lesson.content || 'Lesson notes will appear here.')}</div>
+        <button class="btn ${lesson.completed ? 'ghost' : ''}" data-complete="${lesson.id}" data-done="${lesson.completed}">
+          ${lesson.completed ? 'Mark as not completed' : 'Mark lesson complete'}</button>`);
+      $('[data-close]').addEventListener('click', closeModal);
+      $('[data-complete]').addEventListener('click', async (event) => {
+        const id = event.currentTarget.dataset.complete;
+        const done = event.currentTarget.dataset.done === 'true';
+        try {
+          if (done) await api.del(`/courses/${course.id}/lessons/${id}/complete`);
+          else await api.post(`/courses/${course.id}/lessons/${id}/complete`);
+          closeModal(); toast(done ? 'Lesson reopened.' : 'Lesson completed.'); go('course');
+        } catch (error) { toast(error.message); }
+      });
+    } catch (error) { toast(error.message); }
+  }
+};
+
 PAGES.participant.learning = async (page) => {
   const [modules, materials, threads, progress] = await Promise.all([
     api.get('/learning/modules'), api.get('/learning/materials').catch(() => []),
@@ -823,7 +1244,7 @@ PAGES.participant.learning = async (page) => {
         <div class="grow"><h3 style="margin:0">${esc(t('Level Two'))} · ${esc(t(progress.levelTwoUnlocked ? 'Unlocked' : 'Locked'))}</h3>
           <p style="color:var(--mut);margin-top:4px">${progress.levelTwoUnlocked
             ? 'Unlocked automatically at 80% of Level One. Your project, milestones and deliverables are in My Projects.'
-            : `Level One is ${pct(progress.levelOnePercent)}% complete. At 80% this level opens automatically.`}</p></div>
+            : `Learning is ${pct(progress.levelOnePercent)}% complete and your overall score is ${progress.overallScore}%. At an overall 80% this level opens automatically.`}</p></div>
         <button class="btn ${progress.levelTwoUnlocked ? 'r' : 'ghost'} sm" data-goto="${progress.levelTwoUnlocked ? 'projects' : 'assessments'}">
           ${progress.levelTwoUnlocked ? 'Go to My Projects' : 'Keep learning'} →</button></div>
       ${bar(progress.levelOnePercent)}

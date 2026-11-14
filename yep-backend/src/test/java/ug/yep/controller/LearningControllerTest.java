@@ -45,7 +45,8 @@ class LearningControllerTest {
 
     private Views.ProgressView progress(int levelOne, boolean unlocked) {
         return new Views.ProgressView(levelOne, 12, 15, 0, unlocked, unlocked, 0, 4, 88, 90, false,
-                new Views.PolicyView(18, 35, 80, 65, 75), Map.of("Digital Literacy", levelOne));
+                new Views.PolicyView(18, 35, 80, 65, 75), Map.of("Digital Literacy", levelOne),
+                88, Map.of());
     }
 
     @Test

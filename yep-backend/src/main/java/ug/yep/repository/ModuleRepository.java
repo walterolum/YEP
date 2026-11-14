@@ -7,4 +7,8 @@ import ug.yep.entity.Module;
 public interface ModuleRepository extends JpaRepository<Module, Long> {
 
     List<Module> findAllByOrderBySortOrderAsc();
+
+    List<Module> findByCourseIdOrderBySortOrderAsc(Long courseId);
+
+    long countByCourseId(Long courseId);
 }

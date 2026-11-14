@@ -109,13 +109,24 @@ class AuthServiceTest {
 
     @Test
     void signupOutsideAgeRangeIsRejected() {
-        Requests.SignupRequest request = new Requests.SignupRequest("Young Person",
-                "young@yep.example", null, "Password123!", "Password123!", "Uganda", "Kampala",
-                LocalDate.now().minusYears(15), null, null, "LEVEL_ONE");
+        Requests.SignupRequest request = signup(LocalDate.now().minusYears(15));
 
         BusinessRuleException error = assertThrows(BusinessRuleException.class,
                 () -> service.signup(request));
         assertEquals("YEP is open to young people aged 18 to 35. Your age does not meet the criteria.",
+                error.getMessage());
+    }
+
+    @Test
+    void signupRequiresTermsAndPrivacyConsent() {
+        Requests.SignupRequest request = new Requests.SignupRequest("Young Person",
+                "young@yep.example", null, "Password123!", "Password123!", "Uganda", "Kampala",
+                LocalDate.now().minusYears(22), null, null, null, null, null, null, null, null,
+                false, false, "LEVEL_ONE");
+
+        BusinessRuleException error = assertThrows(BusinessRuleException.class,
+                () -> service.signup(request));
+        assertEquals("Please accept the participation terms and the privacy notice to continue.",
                 error.getMessage());
     }
 
@@ -127,11 +138,16 @@ class AuthServiceTest {
             ReflectionTestUtils.setField(saved, "id", 11L);
             return saved;
         });
-        Requests.SignupRequest request = new Requests.SignupRequest("New Person",
-                "new@yep.example", null, "Password123!", "Password123!", "Uganda", "Kampala",
-                LocalDate.now().minusYears(22), null, null, "LEVEL_ONE");
+        Requests.SignupRequest request = signup(LocalDate.now().minusYears(22));
 
         var result = service.signup(request);
         assertEquals("PENDING", result.user().status());
+    }
+
+    private Requests.SignupRequest signup(LocalDate dateOfBirth) {
+        return new Requests.SignupRequest("New Person", "new@yep.example", null, "Password123!",
+                "Password123!", "Uganda", "Kampala", dateOfBirth, "Makerere University",
+                "Computer Science", "FEMALE", "UNIVERSITY", "UNEMPLOYED", "Become a developer",
+                "en", java.util.Set.of("technology", "design"), true, true, "LEVEL_ONE");
     }
 }

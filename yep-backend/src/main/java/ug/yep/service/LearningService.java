@@ -12,7 +12,6 @@ import ug.yep.entity.Lesson;
 import ug.yep.entity.LessonProgress;
 import ug.yep.entity.Milestone;
 import ug.yep.entity.Module;
-import ug.yep.entity.Submission;
 import ug.yep.entity.Team;
 import ug.yep.entity.User;
 import ug.yep.exception.NotFoundException;
@@ -48,13 +47,14 @@ public class LearningService {
     private final AssessmentRepository assessments;
     private final SettingsService settings;
     private final UserRepository users;
+    private final ProgressCalculator calculator;
 
     public LearningService(ModuleRepository modules, LessonRepository lessons,
                            LessonProgressRepository progress, MaterialRepository materials,
                            TeamRepository teams, MilestoneRepository milestones,
                            SubmissionRepository submissions, AttendanceRepository attendance,
                            AssessmentRepository assessments, SettingsService settings,
-                           UserRepository users) {
+                           UserRepository users, ProgressCalculator calculator) {
         this.modules = modules;
         this.lessons = lessons;
         this.progress = progress;
@@ -66,6 +66,7 @@ public class LearningService {
         this.assessments = assessments;
         this.settings = settings;
         this.users = users;
+        this.calculator = calculator;
     }
 
     @Transactional(readOnly = true)
@@ -106,19 +107,22 @@ public class LearningService {
     @Transactional(readOnly = true)
     public Views.ProgressView progress(Long userId) {
         SettingsService.Policy policy = settings.policy();
-        long totalLessons = lessons.count();
-        long completedLessons = progress.countByUserId(userId);
-        int levelOne = totalLessons == 0 ? 0
-                : (int) Math.round(completedLessons * 100.0 / totalLessons);
+        long totalLessons = calculator.publishedLessonCount();
+        long completedLessons = calculator.completedInPublishedCourses(userId);
+        int levelOne = calculator.globalLessonPercent(userId);
 
         ProgressCounts levelTwo = levelTwoCounts(userId);
         int levelTwoPercent = levelTwo.total == 0 ? 0
                 : (int) Math.round(levelTwo.completed * 100.0 / levelTwo.total);
 
-        int assessmentAverage = assessmentAverage(userId);
-        int attendancePercent = attendancePercent(userId);
+        int assessmentAverage = calculator.assessmentAverage(userId);
+        int attendancePercent = calculator.attendancePercent(userId);
 
-        boolean unlocked = levelOne >= policy.level2MinCompletion();
+        // One weighted score decides the gate; the extra thresholds remain as quality checks.
+        int overallScore = calculator.overall(levelOne, assessmentAverage, attendancePercent);
+        // The gate is monotonic: a learner who already holds a Level Two project is never
+        // retroactively locked out by a later rule or weight change.
+        boolean unlocked = calculator.unlocksLevelTwo(overallScore) || levelTwo.total > 0;
         boolean eligible = unlocked && assessmentAverage >= policy.level2MinAssessment()
                 && attendancePercent >= policy.level2MinAttendance();
 
@@ -132,7 +136,7 @@ public class LearningService {
                 attendancePercent, levelOne == 100 && levelTwoPercent == 100,
                 new Views.PolicyView(policy.minAge(), policy.maxAge(), policy.level2MinCompletion(),
                         policy.level2MinAssessment(), policy.level2MinAttendance()),
-                modulePercents);
+                modulePercents, overallScore, calculator.careerPathScores(userId));
     }
 
     /** Milestone totals across every project the participant's teams work on. */
@@ -149,29 +153,6 @@ public class LearningService {
             completed += projectMilestones.stream().filter(Milestone::isCompleted).count();
         }
         return new ProgressCounts(completed, total);
-    }
-
-    private int assessmentAverage(Long userId) {
-        List<Submission> scored = submissions.findByUserIdOrderBySubmittedAtDesc(userId).stream()
-                .filter(submission -> submission.getScore() != null)
-                .toList();
-        if (scored.isEmpty()) {
-            return 0;
-        }
-        double total = 0;
-        for (Submission submission : scored) {
-            Assessment assessment = submission.getAssessment();
-            total += assessment.percentage(submission.getScore());
-        }
-        return (int) Math.round(total / scored.size());
-    }
-
-    private int attendancePercent(Long userId) {
-        long total = attendance.countByUserId(userId);
-        if (total == 0) {
-            return 0;
-        }
-        return (int) Math.round(attendance.countByUserIdAndPresentTrue(userId) * 100.0 / total);
     }
 
     @Transactional(readOnly = true)

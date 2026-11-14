@@ -59,8 +59,10 @@ public class AdminController {
     @GetMapping("/users")
     public List<Views.UserView> users(@RequestParam(required = false) String role,
                                       @RequestParam(required = false) String status,
-                                      @RequestParam(required = false) String q) {
-        return auth.listUsers(role, status, q);
+                                      @RequestParam(required = false) String q,
+                                      @RequestParam(required = false) String country,
+                                      @RequestParam(required = false) String education) {
+        return auth.listUsers(role, status, q, country, education);
     }
 
     @GetMapping("/staff")
