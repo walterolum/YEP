@@ -34,6 +34,7 @@ class FundingServiceTest {
 
     private FinancialAidApplicationRepository aid;
     private CourseEnrollmentRepository enrollments;
+    private CertificateRepository certificates;
     private FundingService service;
     private Course course;
     private User learner;
@@ -47,9 +48,11 @@ class FundingServiceTest {
         CourseRepository courses = mock(CourseRepository.class);
         UserRepository users = mock(UserRepository.class);
 
+        certificates = mock(CertificateRepository.class);
         service = new FundingService(aid, mock(SponsorshipRepository.class), payments,
-                mock(CertificateRepository.class), mock(CertificateVerificationRepository.class),
-                courses, enrollments, users, mock(NotificationService.class));
+                certificates, courses, enrollments, users, mock(NotificationService.class));
+        when(certificates.save(any(ug.yep.entity.Certificate.class)))
+                .thenAnswer(i -> i.getArgument(0));
 
         CareerPath path = new CareerPath(new Academy("Tech & Digital", "tech-digital"),
                 "Software Development", "software-development");
@@ -112,6 +115,38 @@ class FundingServiceTest {
         assertEquals("REJECTED", application.getStatus());
         org.mockito.Mockito.verify(enrollments, org.mockito.Mockito.never())
                 .save(any(CourseEnrollment.class));
+    }
+
+    @Test
+    void aCompletedCourseYieldsAVerifiableCertificate() {
+        CourseEnrollment enrollment = new CourseEnrollment(learner, course);
+        enrollment.complete();
+        when(enrollments.existsByUserIdAndCourseId(2L, 27L)).thenReturn(true);
+        when(enrollments.findByUserIdAndCourseId(2L, 27L)).thenReturn(Optional.of(enrollment));
+        when(certificates.existsByCodeIgnoreCase(org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(false);
+
+        var view = service.issueCourseCertificate(1L, 2L, 27L);
+
+        assertEquals("COURSE", view.get("scope"));
+        assertTrue(String.valueOf(view.get("code")).startsWith("YEP-"));
+        assertEquals("Amara", view.get("holder"));
+    }
+
+    @Test
+    void anIncompleteCourseCannotBeCertified() {
+        CourseEnrollment enrollment = new CourseEnrollment(learner, course);
+        when(enrollments.existsByUserIdAndCourseId(2L, 27L)).thenReturn(true);
+        when(enrollments.findByUserIdAndCourseId(2L, 27L)).thenReturn(Optional.of(enrollment));
+
+        assertThrows(BusinessRuleException.class, () -> service.issueCourseCertificate(1L, 2L, 27L));
+    }
+
+    @Test
+    void anUnenrolledLearnerCannotBeCertified() {
+        when(enrollments.existsByUserIdAndCourseId(2L, 27L)).thenReturn(false);
+
+        assertThrows(BusinessRuleException.class, () -> service.issueCourseCertificate(1L, 2L, 27L));
     }
 
     @Test

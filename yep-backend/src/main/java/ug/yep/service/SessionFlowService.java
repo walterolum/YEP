@@ -45,7 +45,6 @@ public class SessionFlowService {
 
     private final SessionSeriesRepository series;
     private final EventSessionRepository sessions;
-    private final EventSessionRepository sessionLookup;
     private final AttendanceRepository attendance;
     private final SessionRecordingRepository recordings;
     private final SessionFeedbackRepository feedback;
@@ -66,7 +65,6 @@ public class SessionFlowService {
                               UserRepository users, SessionProvider provider) {
         this.series = series;
         this.sessions = sessions;
-        this.sessionLookup = sessions;
         this.attendance = attendance;
         this.recordings = recordings;
         this.feedback = feedback;
@@ -270,7 +268,7 @@ public class SessionFlowService {
     }
 
     private EventSession session(Long sessionId) {
-        return sessionLookup.findById(sessionId).orElseThrow(() -> new NotFoundException("Session"));
+        return sessions.findById(sessionId).orElseThrow(() -> new NotFoundException("Session"));
     }
 
     private User user(Long userId) {

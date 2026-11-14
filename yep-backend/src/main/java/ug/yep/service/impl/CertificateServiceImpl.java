@@ -9,11 +9,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ug.yep.dto.Views;
 import ug.yep.entity.Certificate;
+import ug.yep.entity.CertificateVerification;
 import ug.yep.entity.User;
 import ug.yep.exception.BusinessRuleException;
 import ug.yep.exception.ForbiddenException;
 import ug.yep.exception.NotFoundException;
 import ug.yep.repository.CertificateRepository;
+import ug.yep.repository.CertificateVerificationRepository;
 import ug.yep.repository.UserRepository;
 import ug.yep.security.CurrentUser;
 import ug.yep.service.AuditService;
@@ -30,15 +32,18 @@ public class CertificateServiceImpl implements CertificateService {
             DateTimeFormatter.ofPattern("dd MMMM yyyy").withZone(ZoneOffset.UTC);
 
     private final CertificateRepository certificates;
+    private final CertificateVerificationRepository verifications;
     private final UserRepository users;
     private final LearningService learning;
     private final NotificationService notifications;
     private final AuditService audit;
 
-    public CertificateServiceImpl(CertificateRepository certificates, UserRepository users,
-                                  LearningService learning, NotificationService notifications,
-                                  AuditService audit) {
+    public CertificateServiceImpl(CertificateRepository certificates,
+                                  CertificateVerificationRepository verifications,
+                                  UserRepository users, LearningService learning,
+                                  NotificationService notifications, AuditService audit) {
         this.certificates = certificates;
+        this.verifications = verifications;
         this.users = users;
         this.learning = learning;
         this.notifications = notifications;
@@ -49,8 +54,8 @@ public class CertificateServiceImpl implements CertificateService {
     @Transactional
     public Views.CertificateView issue(CurrentUser actor, Long userId, String programmeLabel) {
         User holder = users.findById(userId).orElseThrow(() -> new NotFoundException("Participant"));
-        if (certificates.existsByUserId(userId)) {
-            throw new BusinessRuleException("A certificate has already been issued to this participant.");
+        if (certificates.existsByUserIdAndScopeAndScopeId(userId, "PROGRAMME", null)) {
+            throw new BusinessRuleException("A programme certificate has already been issued to this participant.");
         }
         Views.ProgressView progress = learning.progress(userId);
         if (progress.levelOnePercent() != 100 || progress.levelTwoPercent() != 100) {
@@ -62,7 +67,9 @@ public class CertificateServiceImpl implements CertificateService {
         String code = nextCode();
         String label = programmeLabel == null || programmeLabel.isBlank()
                 ? "YEP Youth Empowerment Programme" : programmeLabel.trim();
-        Certificate certificate = certificates.save(new Certificate(code, holder, label, issuer));
+        Certificate certificate = new Certificate(code, holder, label, issuer);
+        certificate.scopeTo("PROGRAMME", null);
+        certificates.save(certificate);
         notifications.send(holder, "CERTIFICATE",
                 "Your certificate is ready. Verification code: " + code);
         audit.record(issuer, "CERTIFICATE_ISSUE", "certificate", certificate.getId(),
@@ -86,14 +93,16 @@ public class CertificateServiceImpl implements CertificateService {
     @Override
     @Transactional(readOnly = true)
     public Optional<Views.CertificateView> forUser(Long userId) {
-        return certificates.findByUserId(userId).map(Views.CertificateView::of);
+        return certificates.findFirstByUserIdOrderByIssuedAtDesc(userId)
+                .map(Views.CertificateView::of);
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public Views.CertificateView verify(String code) {
         Certificate certificate = certificates.findByCodeIgnoreCase(code.trim())
                 .orElseThrow(() -> new NotFoundException("Certificate code " + code));
+        verifications.save(new CertificateVerification(certificate));
         return Views.CertificateView.of(certificate);
     }
 
@@ -103,18 +112,20 @@ public class CertificateServiceImpl implements CertificateService {
         if (!requester.isAdmin() && !requester.id().equals(userId)) {
             throw new ForbiddenException("You can only download your own certificate.");
         }
-        Certificate certificate = certificates.findByUserId(userId)
+        Certificate certificate = certificates.findFirstByUserIdOrderByIssuedAtDesc(userId)
                 .orElseThrow(() -> new NotFoundException("Certificate"));
+        boolean programme = "PROGRAMME".equals(certificate.getScope());
         List<String> lines = List.of(
                 "This certifies that",
                 "",
                 certificate.getUser().getFullName(),
                 "",
-                "has successfully completed both levels of the",
+                programme ? "has successfully completed both levels of the"
+                        : "has successfully completed the course",
                 certificate.getProgrammeLabel(),
                 "",
-                "Level One: 100% module completion",
-                "Level Two: 100% impact project milestones",
+                programme ? "Level One: 100% module completion" : "Verified through YEP assessments",
+                programme ? "Level Two: 100% impact project milestones" : "and a completed course outline",
                 "",
                 "Issued: " + DATE.format(certificate.getIssuedAt()),
                 "Verification code: " + certificate.getCode(),

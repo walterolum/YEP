@@ -74,8 +74,13 @@ versioned with a matching rollback script.
 
 ## Verification
 
-* `./mvnw.cmd -o test` — **131 tests pass**, including new suites for learning experience (6),
-  sessions (4), funding (5) and careers (5).
+* `./mvnw.cmd -o test` — **172 tests pass**, including controller suites for every phase 3–7 surface
+  (learning experience, sessions, funding, careers, impact, public certificate verification) and
+  service suites for learning (6), sessions (4), funding (8) and careers (5).
+* Certificate lifecycle covered by tests: issue requires a completed enrolment, a second programmecertificate is refused, the public endpoint returns the holder and a 404 for unknown codes, and every
+  successful verification is written to `certificate_verifications`.
+* **Demo seed (V19)**: two attributed job postings, two portfolio items for the demo learner and one
+  manual impact row. The migration is idempotent and rollback `R18` removes exactly those rows.
 * Migrations V13–V18 applied to the live `yep` database with `success = 1`.
 * Live checks with real tokens: lesson extras (notes, practice, Q&A), practice mastery, employer job
   posting → learner application, aid application → admin approval → enrolment, sponsor seat, payment

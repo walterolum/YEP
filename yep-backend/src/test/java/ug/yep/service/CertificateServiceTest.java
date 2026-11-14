@@ -28,6 +28,7 @@ import ug.yep.service.impl.CertificateServiceImpl;
 class CertificateServiceTest {
 
     private CertificateRepository certificates;
+    private ug.yep.repository.CertificateVerificationRepository verifications;
     private UserRepository users;
     private LearningService learning;
     private CertificateServiceImpl service;
@@ -40,7 +41,8 @@ class CertificateServiceTest {
         certificates = mock(CertificateRepository.class);
         users = mock(UserRepository.class);
         learning = mock(LearningService.class);
-        service = new CertificateServiceImpl(certificates, users, learning,
+        verifications = mock(ug.yep.repository.CertificateVerificationRepository.class);
+        service = new CertificateServiceImpl(certificates, verifications, users, learning,
                 mock(NotificationService.class), mock(AuditService.class));
 
         User participant = User.create(Enums.Role.PARTICIPANT, "Amara Nakato",
@@ -73,7 +75,7 @@ class CertificateServiceTest {
 
     @Test
     void refusesDuplicateCertificate() {
-        when(certificates.existsByUserId(2L)).thenReturn(true);
+        when(certificates.existsByUserIdAndScopeAndScopeId(2L, "PROGRAMME", null)).thenReturn(true);
 
         assertThrows(BusinessRuleException.class, () -> service.issue(admin, 2L, "YEP Programme"));
     }
@@ -113,6 +115,8 @@ class CertificateServiceTest {
         when(certificates.findByCodeIgnoreCase("YEP-2026-0007")).thenReturn(Optional.of(certificate));
 
         assertEquals("YEP-2026-0007", service.verify("YEP-2026-0007").code());
+        org.mockito.Mockito.verify(verifications).save(
+                org.mockito.ArgumentMatchers.any(ug.yep.entity.CertificateVerification.class));
         assertThrows(ug.yep.exception.NotFoundException.class, () -> service.verify("YEP-2026-9999"));
     }
 }

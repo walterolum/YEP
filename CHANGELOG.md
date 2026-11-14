@@ -1,5 +1,29 @@
 # Changelog
 
+## Controller tests, certificate lifecycle and demo seed (14 November 2026)
+
+### Added
+
+- **Controller tests** for every phase 3–7 endpoint: `LearningExperienceControllerTest`,
+  `SessionFlowControllerTest`, `FundingControllerTest`, `CareersControllerTest`,
+  `ImpactControllerTest` and `PublicCertificateControllerTest` (172 tests in total).
+- **Certificate lifecycle tests**: completion is required before issuing, a duplicate programme
+  certificate is refused, public verification returns the holder and a 404 for unknown codes, and each
+  verification is logged.
+- **Demo seed (V19, rollback R18)**: two job postings, two portfolio items and one impact record, inserted
+  only when the demo accounts exist and the content is absent.
+
+### Fixed (code review)
+
+- `CertificateServiceImpl` looked certificates up with `findByUserId`, which throws once a learner holds
+  more than one certificate; it now uses the latest certificate and scopes programme duplicates.
+- Public verification now records `certificate_verifications`; the duplicate verification path in
+  `FundingService` was removed.
+- PDF wording distinguishes programme certificates from course certificates.
+- Removed a duplicated repository field in `SessionFlowService`.
+- Public certificate verification opened a read-only transaction but now writes its audit row; the
+  annotation was corrected, so verification returns 200 instead of a 500.
+
 ## Phases 3–7 — learning experience, sessions, funding, jobs, hardening (14 November 2026)
 
 ### Added

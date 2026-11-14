@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ug.yep.dto.Requests;
 import ug.yep.entity.Certificate;
-import ug.yep.entity.CertificateVerification;
 import ug.yep.entity.Course;
 import ug.yep.entity.CourseEnrollment;
 import ug.yep.entity.Enums;
@@ -20,7 +19,6 @@ import ug.yep.exception.BusinessRuleException;
 import ug.yep.exception.ForbiddenException;
 import ug.yep.exception.NotFoundException;
 import ug.yep.repository.CertificateRepository;
-import ug.yep.repository.CertificateVerificationRepository;
 import ug.yep.repository.CourseEnrollmentRepository;
 import ug.yep.repository.CourseRepository;
 import ug.yep.repository.FinancialAidApplicationRepository;
@@ -43,7 +41,6 @@ public class FundingService {
     private final SponsorshipRepository sponsorships;
     private final PaymentIntentRepository payments;
     private final CertificateRepository certificates;
-    private final CertificateVerificationRepository verifications;
     private final CourseRepository courses;
     private final CourseEnrollmentRepository enrollments;
     private final UserRepository users;
@@ -52,14 +49,12 @@ public class FundingService {
     public FundingService(FinancialAidApplicationRepository aid,
                           SponsorshipRepository sponsorships, PaymentIntentRepository payments,
                           CertificateRepository certificates,
-                          CertificateVerificationRepository verifications,
                           CourseRepository courses, CourseEnrollmentRepository enrollments,
                           UserRepository users, NotificationService notifications) {
         this.aid = aid;
         this.sponsorships = sponsorships;
         this.payments = payments;
         this.certificates = certificates;
-        this.verifications = verifications;
         this.courses = courses;
         this.enrollments = enrollments;
         this.users = users;
@@ -208,18 +203,6 @@ public class FundingService {
             certificates.save(certificate);
         }
         return certificateView(certificate);
-    }
-
-    /** Public verification: returns the holder, the award and whether it is valid. */
-    @Transactional
-    public Map<String, Object> verify(String code) {
-        Certificate certificate = certificates.findByCodeIgnoreCase(code.trim())
-                .orElseThrow(() -> new NotFoundException("Certificate"));
-        verifications.save(new CertificateVerification(certificate));
-        Map<String, Object> view = certificateView(certificate);
-        view.put("valid", true);
-        view.put("checks", verifications.countByCertificateId(certificate.getId()));
-        return view;
     }
 
     // ---------------------------------------------------------------- helper
