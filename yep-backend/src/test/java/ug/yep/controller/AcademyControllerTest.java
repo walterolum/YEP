@@ -53,23 +53,26 @@ class AcademyControllerTest {
 
     @Test
     void courseSearchPassesFiltersAndTheSignedInLearner() throws Exception {
-        when(catalog.searchCourses("tech-digital", 1, "web", 2L)).thenReturn(List.of());
+        when(catalog.searchCourses("tech-digital", 1, "web", null, null, null, null, 2L))
+                .thenReturn(List.of());
 
         mvc.perform(get("/api/courses").param("academy", "tech-digital").param("level", "1")
                         .param("q", "web"))
                 .andExpect(status().isOk());
 
-        verify(catalog).searchCourses(eq("tech-digital"), eq(1), eq("web"), eq(2L));
+        verify(catalog).searchCourses(eq("tech-digital"), eq(1), eq("web"), isNull(), isNull(),
+                isNull(), isNull(), eq(2L));
     }
 
     @Test
     void anonymousCourseSearchDoesNotClaimEnrolment() throws Exception {
         SecurityContextHolder.clearContext();
-        when(catalog.searchCourses(isNull(), isNull(), isNull(), isNull())).thenReturn(List.of());
+        when(catalog.searchCourses(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(),
+                isNull(), isNull())).thenReturn(List.of());
 
         mvc.perform(get("/api/courses")).andExpect(status().isOk());
 
-        verify(catalog).searchCourses(null, null, null, null);
+        verify(catalog).searchCourses(null, null, null, null, null, null, null, null);
     }
 
     @Test

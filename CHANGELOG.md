@@ -1,5 +1,99 @@
 # Changelog
 
+## Tech & Digital course set (14 November 2026)
+
+### Added
+
+- **Migration V12** (`seed tech courses`): nine attributed courses — Python, Java, SQL, mobile app
+  development, data analysis, AI basics, cybersecurity, UI/UX and digital marketing — with four new career
+  paths (Data & AI, Cybersecurity, Product & Design, Digital Marketing), each course carrying source,
+  licence, author and attribution text. Rollback: `R11`.
+- 18 modules and 36 original lessons (ids 200–235) giving every new course a real outline with outcomes.
+- Tech & Digital now has 11 courses; totals are 24 courses / 43 modules / 91 lessons.
+
+## Phase 2 — catalogue, attributed content, review workflow and ratings (14 November 2026)
+
+### Added
+
+- **Migration V10** (`course licensing ratings and review`): licensing/attribution columns on `courses`
+  (`language`, `certificate_available`, `source_name`, `source_url`, `licence`, `licence_url`, `author`,
+  `attribution_text`), `instructor_id` FK, review state (`review_status`, `review_note`, `submitted_at`,
+  `approved_at`) and rating aggregates (`rating_average`, `rating_count`), plus the `course_reviews` table
+  with a unique `user_id + course_id` key. Rollback: `R9`.
+- **Migration V11** (`seed attributed courses`): four new academies (Math & Science, Soft Skills &
+  Leadership, Career Development, Life Skills), four new courses with four career paths, attribution for
+  every existing course, and 20 modules / 40 lessons across the new academies. Rollback: `R10`.
+- **Instructor authoring**: `POST /api/instructor/courses` creates an attributed draft owned by the
+  instructor; `POST /api/instructor/courses/{id}/submit` enforces attribution and at least one module.
+- **Reviewer decisions**: `GET /api/reviewer/submissions` and `POST /api/reviewer/submissions/{id}/decision`
+  (`APPROVE` publishes, `CHANGES` returns the course with a note). Self-approval is forbidden.
+- **Ratings**: enrolled learners post one review per course; averages are recomputed from stored reviews.
+- **Catalogue filters**: `academy`, `level`, `q`, `language`, `minHours`, `maxHours`, `certificate`,
+  `minRating` on `GET /api/courses`; new `GET /api/courses/{slug}/syllabus`.
+- **SPA**: catalogue filter bar with live results, attribution and review panels on the course page,
+  instructor "New course" form with licence fields, submit-for-review action, and reviewer approve /
+  request-changes buttons.
+- Tests: `CourseWorkflowServiceTest`, `CourseReviewServiceTest` (114 tests total), docs
+  `phase-2-coverage.md` and `phase-2-api.md`.
+
+## Phase 1 — registration, roles and workspaces (14 November 2026)
+
+### Added
+
+- **Migration V9** (`registration roles and verification`): `users.phone_country_code`,
+  `users.country_code`, `email_verification_tokens` (hashed, single-use, 24 h), and the settings
+  `require_email_verification` (off) / `registration_max_per_hour` (5). Rollback: `R8`.
+- **Roles** `INSTRUCTOR`, `EMPLOYER`, `REVIEWER` with account classes and polymorphic capabilities
+  (`canAuthorContent`, `canReviewContent`, `canHire`), admin-created accounts, own dashboards and
+  navigation in the SPA.
+- **Role workspaces**: `/api/instructor/**`, `/api/reviewer/**`, `/api/employer/**`; role-specific
+  dashboard statistics; read-only review queue for reviewers.
+- **Registration**: dial-code select, searchable 249-country list (Africa first) with codes, phone
+  normalisation, password strength meter and shared `PasswordPolicy`, registration rate limiting,
+  automatic email-verification token issued on sign-up with `POST /api/auth/verify-email` and
+  `POST /api/auth/resend-verification`.
+- `GET /api/public/countries`, `docs/phase-1-coverage.md`, `docs/phase-1-api.md`.
+- Tests: `CountryDirectoryTest`, `PasswordPolicyTest`, `VerificationServiceTest`, plus six new
+  `AuthServiceTest` cases (mobile required, weak password, unknown country code, stored dial/country,
+  verification gate).
+
+### Changed
+
+- `AuthService.signup` now takes the client address for throttling and stores the contact block.
+- Content authoring checks capabilities instead of role strings; reviewers gain read-only access to
+  course outlines, instructors gain authoring access.
+
+### Verification
+
+- 106 backend tests and 47 frontend tests pass; `node --check` clean.
+- V9 applied to the dev database with every pre-existing row intact.
+- Live permission matrix: instructor 200/201 on authoring, reviewer 200 read-only and 403 on writes,
+  employer 200 on its own workspace, all three 403 on `/api/admin/users`.
+- Live registration with `+254 / Kenya` stored the dial code and country, and the emailed code was
+  redeemed successfully (200); the probe account was removed afterwards.
+
+## Phase 0 — audit, plan and tab fix (14 November 2026)
+
+### Added
+
+- `docs/phase-0-audit-and-plan.md` — audit of the current system against the eight-phase brief,
+  9-platform emulation matrix, phase/migration plan V9–V16, virtual-session provider recommendation
+  (LiveKit primary, Jitsi fallback behind a `SessionProvider` interface) and the code-runner design
+  (separate service, one container per run, no network, CPU/memory/time limits).
+- `Navigation.test.tsx` case for plain-string tab labels.
+
+### Fixed
+
+- Tab labels can no longer be rendered one character at a time. The SPA has a single `tabStrip`
+  helper that normalises every entry to a `[value, label]` pair (Users screen uses it), and the React
+  `Tabs` component accepts plain strings by converting them to `{ id, label }` instead of spreading
+  them. This is the class of bug behind the reported `v e / i l / o r` labels.
+
+### Notes
+
+- No schema change and no data change in this phase; Flyway remains at V8.
+
+
 ## Phase 2 — Course content, player and the one overall score (2026-11-13)
 
 Extends `yep-backend` (`ug.yep`, database `yep`) in place. Flyway moves to **V8**; the only schema

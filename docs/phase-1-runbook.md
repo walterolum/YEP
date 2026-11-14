@@ -161,7 +161,8 @@ cd yep-backend
 .\mvnw.cmd -o test
 ```
 
-Expected: **88 tests, 0 failures** (catalogue, course player, scoring, auth and the existing suites).
+Expected: **106 tests, 0 failures** (registration and verification, roles, catalogue, course player,
+scoring, auth and the existing suites).
 The overall-score rule has its own suites: `ProgressScoringTest`, `ProgressCalculatorTest` and
 `CourseContentServiceTest`. If Maven reports “Nothing to compile”, run `.\mvnw.cmd -o clean test` — the incremental
 compiler does not notice changes inside records used by stale test classes.

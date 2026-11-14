@@ -36,7 +36,8 @@ class AuthServiceTest {
         when(settings.policy()).thenReturn(new SettingsService.Policy(18, 35, 80, 65, 75));
         service = new AuthService(users, new BCryptPasswordEncoder(), mock(JwtUtil.class),
                 settings, mock(LoginRateLimiter.class), mock(AuditService.class),
-                mock(NotificationService.class));
+                mock(NotificationService.class), new CountryDirectory(),
+                new RegistrationRateLimiter(), mock(VerificationService.class));
 
         User adminUser = User.create(Enums.Role.ADMIN, "YEP Admin", "admin@yep.example", null,
                 "hash", Enums.UserStatus.APPROVED);
@@ -120,9 +121,9 @@ class AuthServiceTest {
     @Test
     void signupRequiresTermsAndPrivacyConsent() {
         Requests.SignupRequest request = new Requests.SignupRequest("Young Person",
-                "young@yep.example", null, "Password123!", "Password123!", "Uganda", "Kampala",
-                LocalDate.now().minusYears(22), null, null, null, null, null, null, null, null,
-                false, false, "LEVEL_ONE");
+                "young@yep.example", "+256", "700000000", "Password123!", "Password123!",
+                "Uganda", "UG", "Kampala", LocalDate.now().minusYears(22), null, null, null,
+                null, null, null, null, null, false, false, "LEVEL_ONE");
 
         BusinessRuleException error = assertThrows(BusinessRuleException.class,
                 () -> service.signup(request));
@@ -145,9 +146,73 @@ class AuthServiceTest {
     }
 
     private Requests.SignupRequest signup(LocalDate dateOfBirth) {
-        return new Requests.SignupRequest("New Person", "new@yep.example", null, "Password123!",
-                "Password123!", "Uganda", "Kampala", dateOfBirth, "Makerere University",
-                "Computer Science", "FEMALE", "UNIVERSITY", "UNEMPLOYED", "Become a developer",
-                "en", java.util.Set.of("technology", "design"), true, true, "LEVEL_ONE");
+        return new Requests.SignupRequest("New Person", "new@yep.example", "+256", "700000000",
+                "Password123!", "Password123!", "Uganda", "UG", "Kampala", dateOfBirth,
+                "Makerere University", "Computer Science", "FEMALE", "UNIVERSITY", "UNEMPLOYED",
+                "Become a developer", "en", java.util.Set.of("technology", "design"),
+                true, true, "LEVEL_ONE");
+    }
+
+    @Test
+    void signupRequiresAMobileNumber() {
+        Requests.SignupRequest request = new Requests.SignupRequest("No Phone", "phone@yep.example",
+                "+256", null, "Password123!", "Password123!", "Uganda", "UG", "Kampala",
+                LocalDate.now().minusYears(22), null, null, null, null, null, null, null, null,
+                true, true, "LEVEL_ONE");
+
+        BusinessRuleException error = assertThrows(BusinessRuleException.class,
+                () -> service.signup(request));
+        assertEquals("A mobile number is required.", error.getMessage());
+    }
+
+    @Test
+    void signupRejectsAWeakPassword() {
+        Requests.SignupRequest request = new Requests.SignupRequest("Weak Pass", "weak@yep.example",
+                "+256", "700000000", "abcdefgh", "abcdefgh", "Uganda", "UG", "Kampala",
+                LocalDate.now().minusYears(22), null, null, null, null, null, null, null, null,
+                true, true, "LEVEL_ONE");
+
+        BusinessRuleException error = assertThrows(BusinessRuleException.class,
+                () -> service.signup(request));
+        assertEquals("Choose a stronger password: mix upper and lower case with a number or a symbol.",
+                error.getMessage());
+    }
+
+    @Test
+    void signupRejectsAnUnknownCountryCode() {
+        Requests.SignupRequest request = new Requests.SignupRequest("No Country", "zz@yep.example",
+                "+256", "700000000", "Password123!", "Password123!", "Atlantis", "ZZ", "Kampala",
+                LocalDate.now().minusYears(22), null, null, null, null, null, null, null, null,
+                true, true, "LEVEL_ONE");
+
+        BusinessRuleException error = assertThrows(BusinessRuleException.class,
+                () -> service.signup(request));
+        assertEquals("Choose a country from the list.", error.getMessage());
+    }
+
+    @Test
+    void signupStoresDialCodeCountryCodeAndDigitsOnlyPhone() {
+        when(users.existsByEmailIgnoreCase("new@yep.example")).thenReturn(false);
+        when(users.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var view = service.signup(signup(LocalDate.now().minusYears(24)));
+
+        assertEquals("+256", view.user().phoneCountryCode());
+        assertEquals("UG", view.user().countryCode());
+        assertEquals("Uganda", view.user().country());
+        assertEquals("700000000", view.user().phone());
+    }
+
+    @Test
+    void loginIsBlockedUntilTheEmailIsVerifiedWhenRequired() {
+        User approved = participant(Enums.UserStatus.APPROVED);
+        approved.changePassword(new BCryptPasswordEncoder().encode("Password123!"));
+        when(users.findByEmailIgnoreCase("amara@yep.example")).thenReturn(Optional.of(approved));
+        when(settings.requireEmailVerification()).thenReturn(true);
+
+        BusinessRuleException error = assertThrows(BusinessRuleException.class,
+                () -> service.login(new Requests.LoginRequest("amara@yep.example", "Password123!")));
+        assertEquals("Please verify your email address before signing in. "
+                + "Check your notifications for the code.", error.getMessage());
     }
 }

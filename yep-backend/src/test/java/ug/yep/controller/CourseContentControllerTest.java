@@ -105,7 +105,10 @@ class CourseContentControllerTest {
     private Views.CourseOutlineView outline(boolean enrolled, int percent, Long resumeLessonId) {
         Views.CourseView course = new Views.CourseView(1L, 1L, "Digital Foundations", 1L,
                 "Tech & Digital", "YEP-CORE-L1", "YEP Core — Level One", "yep-core-level-one",
-                "The existing curriculum.", null, 1, 15, "🎓", 1, 3, true, enrolled);
+                "The existing curriculum.", null, 1, 15, "🎓", 1, 3, true, enrolled,
+                "en", true, "YEP original curriculum", null, "YEP original — all rights reserved",
+                null, "YEP Curriculum Team", "Original YEP content.", "YEP Curriculum Team",
+                "PUBLISHED", null, 0.0, 0);
         Views.LessonView lesson = new Views.LessonView(1L, "Introduction to digital tools", "VIDEO",
                 20, false);
         Views.ModuleView module = new Views.ModuleView(1L, "Digital Literacy", "💻", "Start safely.",

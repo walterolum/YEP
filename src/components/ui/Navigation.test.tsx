@@ -31,6 +31,16 @@ describe('Tabs', () => {
     expect(onChange).toHaveBeenCalledWith('milestones');
   });
 
+  it('accepts plain string tabs as [value, label] pairs instead of spreading them', () => {
+    // Regression for the reported "v e / i l / o r" labels in My Projects.
+    render(<Tabs items={['Overview', 'Milestones', 'Deliverables']} active="Overview" onChange={() => undefined} ariaLabel="Project views" />);
+
+    for (const label of ['Overview', 'Milestones', 'Deliverables']) {
+      const tab = screen.getByRole('tab', { name: label });
+      expect(tab.textContent).toBe(label);
+    }
+  });
+
   it('renders only the selected panel', () => {
     const { rerender } = render(
       <TabPanel id="overview" active="overview">

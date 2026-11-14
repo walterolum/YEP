@@ -13,6 +13,7 @@ import ug.yep.security.CurrentUser;
 import ug.yep.service.DashboardService;
 import ug.yep.service.LearningService;
 import ug.yep.service.NotificationService;
+import ug.yep.service.RoleWorkspaceService;
 
 /** One role-aware dashboard payload so the client makes a single call on sign-in. */
 @RestController
@@ -22,12 +23,14 @@ public class DashboardController {
     private final DashboardService dashboard;
     private final LearningService learning;
     private final NotificationService notifications;
+    private final RoleWorkspaceService workspace;
 
     public DashboardController(DashboardService dashboard, LearningService learning,
-                               NotificationService notifications) {
+                               NotificationService notifications, RoleWorkspaceService workspace) {
         this.dashboard = dashboard;
         this.learning = learning;
         this.notifications = notifications;
+        this.workspace = workspace;
     }
 
     @GetMapping
@@ -41,6 +44,11 @@ public class DashboardController {
             Views.ProgressView progress = learning.progress(actor.id());
             payload.put("progress", progress);
             payload.put("stats", dashboard.participant(actor.id(), progress));
+        } else if (actor.role() == Enums.Role.INSTRUCTOR
+                || actor.role() == Enums.Role.REVIEWER
+                || actor.role() == Enums.Role.EMPLOYER) {
+            // Each workspace sees its own numbers, never the administrator's console totals.
+            payload.put("stats", workspace.stats());
         } else {
             payload.put("stats", dashboard.admin());
         }

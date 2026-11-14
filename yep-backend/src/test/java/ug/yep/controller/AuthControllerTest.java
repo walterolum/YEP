@@ -23,6 +23,7 @@ import ug.yep.entity.Enums;
 import ug.yep.entity.User;
 import ug.yep.security.CurrentUser;
 import ug.yep.service.AuthService;
+import ug.yep.service.VerificationService;
 
 /** HTTP contract for sign-up, sign-in and the signed-in account. */
 class AuthControllerTest {
@@ -38,7 +39,7 @@ class AuthControllerTest {
                 null, "x", Enums.UserStatus.APPROVED);
         ReflectionTestUtils.setField(entity, "id", 2L);
         user = Views.UserView.of(entity);
-        mvc = MockMvcBuilders.standaloneSetup(new AuthController(auth))
+        mvc = MockMvcBuilders.standaloneSetup(new AuthController(auth, mock(VerificationService.class)))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
@@ -59,7 +60,7 @@ class AuthControllerTest {
 
     @Test
     void signupReturns201WithPendingMessage() throws Exception {
-        when(auth.signup(any())).thenReturn(new Views.AuthView(null, 0, user));
+        when(auth.signup(any(), any())).thenReturn(new Views.AuthView(null, 0, user));
 
         mvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)

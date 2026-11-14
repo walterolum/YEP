@@ -32,10 +32,15 @@ public class AuthService {
     private final LoginRateLimiter rateLimiter;
     private final AuditService audit;
     private final NotificationService notifications;
+    private final CountryDirectory countries;
+    private final RegistrationRateLimiter registrationLimiter;
+    private final VerificationService verification;
 
     public AuthService(UserRepository users, PasswordEncoder passwordEncoder, JwtUtil jwtUtil,
                        SettingsService settings, LoginRateLimiter rateLimiter, AuditService audit,
-                       NotificationService notifications) {
+                       NotificationService notifications, CountryDirectory countries,
+                       RegistrationRateLimiter registrationLimiter,
+                       VerificationService verification) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
@@ -43,13 +48,24 @@ public class AuthService {
         this.rateLimiter = rateLimiter;
         this.audit = audit;
         this.notifications = notifications;
+        this.countries = countries;
+        this.registrationLimiter = registrationLimiter;
+        this.verification = verification;
+    }
+
+    /** Registration without a client address (tests and internal calls). */
+    @Transactional
+    public Views.AuthView signup(Requests.SignupRequest request) {
+        return signup(request, null);
     }
 
     @Transactional
-    public Views.AuthView signup(Requests.SignupRequest request) {
+    public Views.AuthView signup(Requests.SignupRequest request, String clientAddress) {
+        registrationLimiter.check(clientAddress);
         if (request.confirmPassword() != null && !request.confirmPassword().equals(request.password())) {
             throw new BusinessRuleException("The two passwords do not match.");
         }
+        PasswordPolicy.validate(request.password());
         if (users.existsByEmailIgnoreCase(request.email())) {
             throw new BusinessRuleException("An account with that email already exists.");
         }
@@ -67,10 +83,15 @@ public class AuthService {
             throw new BusinessRuleException("YEP is open to young people aged "
                     + policy.minAge() + " to " + policy.maxAge() + ". Your age does not meet the criteria.");
         }
+        String phone = normalisePhone(request.phone());
+        String dialCode = normaliseDialCode(request.phoneCountryCode());
+        CountryDirectory.Country country = resolveCountry(request.countryCode(), request.country());
         User user = User.create(Enums.Role.PARTICIPANT, request.fullName(), request.email(),
-                request.phone(), passwordEncoder.encode(request.password()), Enums.UserStatus.PENDING);
-        user.updateProfile(request.fullName(), request.phone(), request.country(), request.district(),
+                phone, passwordEncoder.encode(request.password()), Enums.UserStatus.PENDING);
+        user.updateProfile(request.fullName(), phone, request.country(), request.district(),
                 request.dateOfBirth(), request.institution(), request.fieldOfStudy());
+        user.applyContact(dialCode, phone, country == null ? null : country.code(),
+                country == null ? request.country() : country.name());
         Instant now = Instant.now();
         user.applyRegistration(request.gender(), request.educationLevel(), request.employmentStatus(),
                 request.careerGoal(), language(request.preferredLanguage()), limited(request.interests()),
@@ -78,6 +99,9 @@ public class AuthService {
         user.changeStatus(Enums.UserStatus.PENDING);
         User saved = users.save(user);
         audit.record(saved, "REGISTER", "user", saved.getId(), "Self-registration submitted");
+        // Until an SMTP provider exists the verification code arrives as a notification.
+        verification.resend(saved);
+        registrationLimiter.record(clientAddress);
         return new Views.AuthView(null, 0, Views.UserView.of(saved));
     }
 
@@ -99,6 +123,10 @@ public class AuthService {
                     "Your account has been suspended. Please contact the YEP team.");
             default -> {
             }
+        }
+        if (settings.requireEmailVerification() && user.getEmailVerifiedAt() == null) {
+            throw new BusinessRuleException(
+                    "Please verify your email address before signing in. Check your notifications for the code.");
         }
         rateLimiter.clear(key);
         user.recordLogin();
@@ -135,6 +163,7 @@ public class AuthService {
         if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
             throw new BusinessRuleException("Your current password is incorrect.");
         }
+        PasswordPolicy.validate(request.newPassword());
         user.changePassword(passwordEncoder.encode(request.newPassword()));
         audit.record(user, "PASSWORD_CHANGE", "user", user.getId(), "Password updated");
     }
@@ -232,6 +261,45 @@ public class AuthService {
 
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    /** Keeps digits only, drops a local trunk zero and enforces a plausible length. */
+    private static String normalisePhone(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new BusinessRuleException("A mobile number is required.");
+        }
+        String digits = raw.replaceAll("[^0-9]", "");
+        if (digits.startsWith("0") && digits.length() > 6) {
+            digits = digits.substring(1);
+        }
+        if (digits.length() < 6 || digits.length() > 15) {
+            throw new BusinessRuleException("Enter a valid mobile number.");
+        }
+        return digits;
+    }
+
+    private static String normaliseDialCode(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String dial = raw.trim();
+        if (!dial.startsWith("+")) {
+            dial = "+" + dial;
+        }
+        if (!dial.matches("\\+[0-9]{1,4}")) {
+            throw new BusinessRuleException("Choose a valid country dial code.");
+        }
+        return dial;
+    }
+
+    /** Country code wins over a free-text name; an unknown name is kept as typed. */
+    private CountryDirectory.Country resolveCountry(String countryCode, String countryName) {
+        if (countryCode != null && !countryCode.isBlank()) {
+            return countries.byCode(countryCode)
+                    .orElseThrow(() -> new BusinessRuleException(
+                            "Choose a country from the list."));
+        }
+        return countries.byName(countryName).orElse(null);
     }
 
     /** Only the four dictionaries the interface ships with are accepted. */

@@ -28,7 +28,8 @@ public final class Views {
     private Views() {
     }
 
-    public record UserView(Long id, String fullName, String email, String phone, String role,
+    public record UserView(Long id, String fullName, String email, String phone,
+                           String phoneCountryCode, String countryCode, String role,
                            String status, String gender, String country, String district,
                            LocalDate dateOfBirth, String institution, String fieldOfStudy,
                            String educationLevel, String employmentStatus, String careerGoal,
@@ -39,6 +40,7 @@ public final class Views {
 
         public static UserView of(User user) {
             return new UserView(user.getId(), user.getFullName(), user.getEmail(), user.getPhone(),
+                    user.getPhoneCountryCode(), user.getCountryCode(),
                     user.getRole().name(), user.getStatus().name(), user.getGender(), user.getCountry(),
                     user.getDistrict(), user.getDateOfBirth(), user.getInstitution(),
                     user.getFieldOfStudy(), user.getEducationLevel(), user.getEmploymentStatus(),
@@ -237,7 +239,31 @@ public final class Views {
                              String academyName, String code, String title, String slug,
                              String summary, String description, int level, int durationHours,
                              String icon, long moduleCount, long lessonCount, boolean published,
-                             boolean enrolled) {
+                             boolean enrolled, String language, boolean certificateAvailable,
+                             String sourceName, String sourceUrl, String licence, String licenceUrl,
+                             String author, String attributionText, String instructorName,
+                             String reviewStatus, String reviewNote, double ratingAverage,
+                             int ratingCount) {
+    }
+
+    /** One step of the published syllabus: module heading with its lesson titles. */
+    public record SyllabusLessonView(Long id, String title, String type, int durationMinutes) {
+    }
+
+    public record SyllabusModuleView(Long id, String name, String icon, String outcome,
+                                     List<SyllabusLessonView> lessons) {
+    }
+
+    public record SyllabusView(CourseView course, List<SyllabusModuleView> modules) {
+    }
+
+    public record CourseReviewView(Long id, String learnerName, int rating, String body,
+                                   Instant createdAt) {
+
+        public static CourseReviewView of(ug.yep.entity.CourseReview review) {
+            return new CourseReviewView(review.getId(), review.getUser().getFullName(),
+                    review.getRating(), review.getBody(), review.getCreatedAt());
+        }
     }
 
     public record CareerPathView(Long id, Long academyId, String academyName, String title, String slug,

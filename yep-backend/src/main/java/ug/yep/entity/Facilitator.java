@@ -25,4 +25,9 @@ public class Facilitator extends User {
     public boolean canFacilitate() {
         return true;
     }
+
+    @Override
+    public boolean canAuthorContent() {
+        return true;
+    }
 }

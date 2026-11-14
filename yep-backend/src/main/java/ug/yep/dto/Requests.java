@@ -22,10 +22,12 @@ public final class Requests {
     public record SignupRequest(
             @NotBlank @Size(max = 120) String fullName,
             @NotBlank @Email @Size(max = 190) String email,
+            @Size(max = 8) String phoneCountryCode,
             @Size(max = 40) String phone,
             @NotBlank @Size(min = 8, max = 72) String password,
             String confirmPassword,
             @Size(max = 80) String country,
+            @Size(max = 2) String countryCode,
             @Size(max = 80) String district,
             LocalDate dateOfBirth,
             @Size(max = 160) String institution,
@@ -42,6 +44,9 @@ public final class Requests {
     }
 
     public record LoginRequest(@NotBlank @Email String email, @NotBlank String password) {
+    }
+
+    public record VerifyEmailRequest(@NotBlank @Size(max = 200) String token) {
     }
 
     public record ProfileUpdateRequest(
@@ -145,6 +150,31 @@ public final class Requests {
             @Size(max = 16) String icon,
             int sortOrder,
             Boolean published) {
+    }
+
+    /** Instructor submission: catalogue basics plus the mandatory attribution block. */
+    public record InstructorCourseRequest(
+            @NotNull Long careerPathId,
+            @NotBlank @Size(max = 40) String code,
+            @NotBlank @Size(max = 160) String title,
+            @Size(max = 500) String summary,
+            @Size(max = 4000) String description,
+            @Min(1) @Max(2) int level,
+            @Min(0) int durationHours,
+            @Size(max = 8) String language,
+            Boolean certificateAvailable,
+            @Size(max = 160) String sourceName,
+            @Size(max = 400) String sourceUrl,
+            @Size(max = 80) String licence,
+            @Size(max = 400) String licenceUrl,
+            @Size(max = 160) String author,
+            @Size(max = 1000) String attributionText) {
+    }
+
+    public record CourseDecisionRequest(@NotBlank String decision, @Size(max = 1000) String note) {
+    }
+
+    public record CourseReviewRequest(@Min(1) @Max(5) int rating, @Size(max = 2000) String body) {
     }
 
     public record CreateProjectRequest(@NotBlank @Size(max = 160) String title,

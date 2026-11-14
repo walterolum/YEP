@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import ug.yep.dto.Views;
 import ug.yep.service.CertificateService;
+import ug.yep.service.CountryDirectory;
 import ug.yep.service.DashboardService;
 import ug.yep.service.ProgrammeService;
 
@@ -19,13 +20,22 @@ public class PublicController {
     private final ProgrammeService programmes;
     private final CertificateService certificates;
     private final ug.yep.repository.UserRepository users;
+    private final CountryDirectory countries;
 
     public PublicController(DashboardService dashboard, ProgrammeService programmes,
-                            CertificateService certificates, ug.yep.repository.UserRepository users) {
+                            CertificateService certificates, ug.yep.repository.UserRepository users,
+                            CountryDirectory countries) {
         this.dashboard = dashboard;
         this.programmes = programmes;
         this.certificates = certificates;
         this.users = users;
+        this.countries = countries;
+    }
+
+    /** Every ISO country, African countries first, each with its dial code. */
+    @GetMapping("/countries")
+    public java.util.List<CountryDirectory.Country> countries() {
+        return countries.all();
     }
 
     @GetMapping("/mentors")

@@ -79,7 +79,7 @@ public class CourseContentService {
     /** Authoring view of the same outline, including drafts and modules not yet published. */
     @Transactional(readOnly = true)
     public Views.CourseOutlineView authoringOutline(Long actorId, Long courseId) {
-        requireContentAuthor(actorId);
+        requireContentReader(actorId);
         Course course = courses.findById(courseId).orElseThrow(() -> new NotFoundException("Course"));
         return outlineOf(null, course);
     }
@@ -297,10 +297,20 @@ public class CourseContentService {
                 ProgressScoring.percent(done, moduleLessons.size()), lessonViews);
     }
 
+    /** Authoring rights: administrators, facilitators and instructors. */
     private void requireContentAuthor(Long actorId) {
         User actor = users.findById(actorId).orElseThrow(() -> new NotFoundException("Account"));
-        if (actor.getRole() != Enums.Role.ADMIN && actor.getRole() != Enums.Role.FACILITATOR) {
-            throw new ForbiddenException("Only administrators and facilitators manage course content.");
+        if (!actor.canAuthorContent()) {
+            throw new ForbiddenException(
+                    "Only administrators, facilitators and instructors manage course content.");
+        }
+    }
+
+    /** Read-only rights widen authoring to reviewers, who inspect outlines before release. */
+    private void requireContentReader(Long actorId) {
+        User actor = users.findById(actorId).orElseThrow(() -> new NotFoundException("Account"));
+        if (!actor.canAuthorContent() && !actor.canReviewContent()) {
+            throw new ForbiddenException("Your role cannot open the course content workspace.");
         }
     }
 

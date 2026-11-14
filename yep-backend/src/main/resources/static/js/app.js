@@ -83,6 +83,24 @@ const table = (columns, rows, search = true) => `${search
   <tbody data-body>${rows.length ? rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('')
     : `<tr><td colspan="${columns.length}" style="color:var(--mut)">Nothing here yet.</td></tr>`}</tbody></table></div>`;
 
+/* Tabs are always [value, label] pairs. A bare string passed here used to be
+   iterated character by character, which is how a tab label rendered as
+   "v e / i l / o r" instead of one word. Plain strings and objects are
+   normalised instead of spread, so that class of bug cannot come back. */
+const tabStrip = (pairs, active, opts = {}) => {
+  const { attribute = 'data-tab', counts = {}, className = '' } = opts;
+  const entries = (pairs || []).map((entry) => {
+    if (Array.isArray(entry)) return [String(entry[0]), entry[1] ?? entry[0]];
+    if (entry && typeof entry === 'object') return [String(entry.value ?? entry.id ?? ''), entry.label ?? ''];
+    return [String(entry ?? ''), String(entry ?? '')];
+  });
+  return `<div class="tabs${className ? ' ' + className : ''}">${entries.map(([value, label]) => {
+    const count = counts[value];
+    return `<button type="button" class="${value === (active ?? '') ? 'on' : ''}" ${attribute}="${esc(value)}"
+      aria-pressed="${value === (active ?? '')}">${esc(t(label))}${typeof count === 'number' ? `<span class="tag">${count}</span>` : ''}</button>`;
+  }).join('')}</div>`;
+};
+
 function modal(html) {
   $$('.modal').forEach((node) => node.remove());
   const wrap = document.createElement('div');
@@ -108,10 +126,14 @@ const NAV = {
     ['participants', 'Participants', '👥'], ['assessments', 'Assessments', '📝'], ['reports', 'Reports', '📈']],
   sponsor: [['dashboard', 'Dashboard', '▦'], ['contributions', 'My Contributions', '💰'],
     ['impact', 'Impact Reports', '📈'], ['partnerships', 'Partnerships', '🏢'], ['messages', 'Messages', '💬']],
+  instructor: [['dashboard', 'Dashboard', '▦'], ['courses', 'My Courses', '📘'], ['sessions', 'Sessions', '📅']],
+  reviewer: [['dashboard', 'Dashboard', '▦'], ['courses', 'Review Queue', '🔎']],
+  employer: [['dashboard', 'Dashboard', '▦']],
 };
 
 const PAGES = {
   admin: {}, participant: {}, mentor: {}, facilitator: {}, sponsor: {},
+  instructor: {}, reviewer: {}, employer: {},
 };
 
 function shell(role, key) {
@@ -281,10 +303,14 @@ function signupScreen() {
       <div class="fgrid">
         <label class="lbl">Full name<div class="fld"><input name="fullName" required placeholder="Your full name"></div></label>
         <label class="lbl">Email<div class="fld"><input name="email" type="email" required placeholder="you@example.com"></div></label>
-        <label class="lbl">Phone<div class="fld"><input name="phone" placeholder="+256…"></div></label>
+        <label class="lbl">Mobile number<div class="fld" style="gap:6px">
+          <select name="phoneCountryCode" id="dialSelect" aria-label="Country dial code" style="max-width:150px">
+            <option value="+256">+256 Uganda</option></select>
+          <input name="phone" inputmode="tel" required placeholder="700 000 000" aria-label="Mobile number"></div></label>
         <label class="lbl">Date of birth<div class="fld"><input name="dateOfBirth" type="date" required max="${new Date().getFullYear() - 18}-12-31"></div></label>
         ${sel('Gender', 'gender', ['', 'Female', 'Male', 'Other', 'Prefer not to say'])}
-        <label class="lbl">Country<div class="fld"><input name="country" value="Uganda"></div></label>
+        <label class="lbl">Country<div class="fld"><input name="country" list="countryOptions"
+          autocomplete="off" required placeholder="Start typing a country"></div></label>
         <label class="lbl">District<div class="fld"><input name="district"></div></label>
       </div>
       <div class="fgrid">
@@ -300,9 +326,13 @@ function signupScreen() {
         ${['Technology', 'Business', 'Health', 'Creative arts', 'Agriculture', 'Climate', 'Education', 'Civic engagement']
           .map((interest) => `<label class="chip"><input type="checkbox" name="interests" value="${esc(interest)}"> ${esc(interest)}</label>`).join('')}
       </div></div>
+      <input type="hidden" name="countryCode">
+      <datalist id="countryOptions"></datalist>
       <div class="fgrid">
-        <label class="lbl">Password<div class="fld"><input name="password" type="password" required minlength="8"></div></label>
-        <label class="lbl">Confirm password<div class="fld"><input name="confirmPassword" type="password" required minlength="8"></div></label>
+        <label class="lbl">Password<div class="fld"><input name="password" type="password" required minlength="8" autocomplete="new-password"></div>
+          <div class="pw" data-pw><div class="pw-bars"><i></i><i></i><i></i><i></i></div>
+            <small data-pw-label>At least 8 characters</small></div></label>
+        <label class="lbl">Confirm password<div class="fld"><input name="confirmPassword" type="password" required minlength="8" autocomplete="new-password"></div></label>
       </div>
       <label class="row" style="justify-content:flex-start;gap:8px">
         <input type="checkbox" name="termsAccepted" required> I accept the participation terms</label>
@@ -312,6 +342,9 @@ function signupScreen() {
       <button class="btn y full" type="submit">Create Account</button>
       <div class="ctr">Already registered? <a class="lnk" href="#/login">Sign in</a></div>
     </form></div>`);
+
+  loadCountryOptions($('#signupForm'));
+  bindPasswordStrength($('#signupForm'));
 
   $('#signupForm').addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -334,6 +367,62 @@ function signupScreen() {
       form.querySelector('[data-err]').style.color = 'var(--bad)';
       form.querySelector('[data-err]').textContent = error.message;
     } finally { busy(button, false); }
+  });
+}
+
+/* Countries and password strength shared by the sign-up form. */
+let countryCache = null;
+async function countryOptions() {
+  if (!countryCache) countryCache = await api.get('/public/countries');
+  return countryCache;
+}
+
+async function loadCountryOptions(form) {
+  if (!form) return;
+  try {
+    const countries = await countryOptions();
+    const list = form.querySelector('#countryOptions');
+    const dial = form.querySelector('#dialSelect');
+    if (list) {
+      list.innerHTML = countries.map((country) => `<option value="${esc(country.name)}" data-code="${esc(country.code)}"></option>`).join('');
+    }
+    if (dial) {
+      dial.innerHTML = countries.filter((country) => country.dialCode).map((country) =>
+        `<option value="${esc(country.dialCode)}" ${country.code === 'UG' ? 'selected' : ''}>${esc(country.dialCode)} ${esc(country.name)}</option>`).join('');
+    }
+    const countryInput = form.querySelector('input[name="country"]');
+    const codeInput = form.querySelector('input[name="countryCode"]');
+    if (!countryInput || !codeInput) return;
+    countryInput.addEventListener('change', () => {
+      const match = countries.find((country) => country.name.toLowerCase() === countryInput.value.trim().toLowerCase());
+      codeInput.value = match ? match.code : '';
+      if (match && match.dialCode && dial) dial.value = match.dialCode;
+    });
+  } catch { /* the learner can still type their country */ }
+}
+
+function passwordScore(value) {
+  if (!value) return 0;
+  let score = 0;
+  if (value.length >= 8) score++;
+  if (value.length >= 12) score++;
+  const classes = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter((re) => re.test(value)).length;
+  if (classes >= 3) score++;
+  if (classes >= 4) score++;
+  return Math.min(4, score);
+}
+
+function bindPasswordStrength(form) {
+  const input = form?.querySelector('input[name="password"]');
+  const meter = form?.querySelector('[data-pw]');
+  if (!input || !meter) return;
+  const bars = [...meter.querySelectorAll('i')];
+  const label = meter.querySelector('[data-pw-label]');
+  const words = ['Too weak', 'Weak', 'Fair', 'Good', 'Strong'];
+  input.addEventListener('input', () => {
+    const score = passwordScore(input.value);
+    bars.forEach((bar, index) => bar.classList.toggle('on', index < score));
+    label.textContent = input.value ? words[score] : 'At least 8 characters';
   });
 }
 
@@ -360,6 +449,9 @@ const USER_ROLES = [
   { value: 'MENTOR', label: 'Mentors' },
   { value: 'FACILITATOR', label: 'Facilitators' },
   { value: 'SPONSOR', label: 'Sponsors' },
+  { value: 'INSTRUCTOR', label: 'Instructors' },
+  { value: 'REVIEWER', label: 'Reviewers' },
+  { value: 'EMPLOYER', label: 'Employers' },
   { value: 'ADMIN', label: 'Admins' },
 ];
 
@@ -377,8 +469,8 @@ PAGES.admin.participants = async (page) => {
   const distinct = (key) => [...new Set(allUsers.map((user) => user[key]).filter(Boolean))].sort();
   page.innerHTML = head('User management', 'Create accounts and approve, suspend or reject any user',
     '<button class="btn sm" data-new>+ Create user</button>') +
-    `<section class="card"><div class="tabs role-tabs">${USER_ROLES.map((tab) => `<button class="${tab.value === role ? 'on' : ''}"
-      data-role="${tab.value}">${esc(t(tab.label))}${tab.value ? `<span class="tag">${counts[tab.value] || 0}</span>` : ''}</button>`).join('')}</div>
+    `<section class="card">${tabStrip(USER_ROLES.map((tab) => [tab.value, tab.label]), role,
+      { attribute: 'data-role', className: 'role-tabs', counts: USER_ROLES.reduce((map, tab) => (tab.value ? { ...map, [tab.value]: counts[tab.value] || 0 } : map), {}) })}
     <div class="fgrid" style="margin-bottom:12px">
       ${sel('Country', 'countryFilter', [{ value: '', label: 'All countries' }, ...distinct('country')], state.userCountry || '')}
       ${sel('Education level', 'educationFilter', [{ value: '', label: 'All education levels' }, ...distinct('educationLevel')], state.userEducation || '')}
@@ -651,7 +743,7 @@ PAGES.admin.courseContent = async (page) => {
     </section>`).join('') : `<div class="card">${empty('No modules yet. Add the first module.')}</div>`);
 
   const moduleById = new Map(outline.modules.map((module) => [module.id, module]));
-  $('[data-back]').addEventListener('click', () => go('academies'));
+  $('[data-back]').addEventListener('click', () => go(state.contentBack || 'academies'));
   $$('[data-new-module]').forEach((b) => b.addEventListener('click', () => moduleForm()));
   $$('[data-edit-module]').forEach((b) => b.addEventListener('click', () => moduleForm(moduleById.get(Number(b.dataset.editModule)))));
   $$('[data-add-lesson]').forEach((b) => b.addEventListener('click', () => lessonForm(Number(b.dataset.addLesson))));
@@ -1110,9 +1202,22 @@ PAGES.participant.academies = async (page) => {
   const [academies, mine] = await Promise.all([
     api.get('/academies'), api.get('/me/enrollments').catch(() => []),
   ]);
-  page.innerHTML = head('Academies', 'Choose an academy, explore its career paths and enrol in a course') +
-    hero('Six academies, one journey', 'Every academy has career paths that start at Level One and unlock Level Two at 80%.',
+  page.innerHTML = head('Academies', 'Choose an academy, search the catalogue and enrol in a course') +
+    hero(`${academies.length} academy groups, one journey`,
+      'Every academy has career paths that start at Level One and unlock Level Two at 80%.',
       '<button class="btn y sm" data-goto="learning">Go to Learning Hub →</button>', '🏫') +
+    `<section class="card"><h3>Find a course</h3>
+      <form id="catalogueFilters" class="fgrid">
+        <label class="lbl">Search<div class="fld"><input name="q" placeholder="Course, code or topic"></div></label>
+        <label class="lbl">Academy<div class="fld"><select name="academy"><option value="">All academies</option>
+          ${academies.map((academy) => `<option value="${esc(academy.slug)}">${esc(academy.name)}</option>`).join('')}</select></div></label>
+        ${sel('Level', 'level', [{ value: '', label: 'Any level' }, { value: '1', label: 'Level One' }, { value: '2', label: 'Level Two' }])}
+        ${sel('Language', 'language', [{ value: '', label: 'Any language' }, { value: 'en', label: 'English' }, { value: 'sw', label: 'Kiswahili' }, { value: 'fr', label: 'French' }])}
+        ${sel('Duration', 'maxHours', [{ value: '', label: 'Any duration' }, { value: '10', label: 'Under 10 hours' }, { value: '30', label: 'Under 30 hours' }, { value: '60', label: 'Under 60 hours' }])}
+        ${sel('Certificate', 'certificate', [{ value: '', label: 'Any' }, { value: 'true', label: 'Certificate available' }])}
+        ${sel('Rating', 'minRating', [{ value: '', label: 'Any rating' }, { value: '3', label: '3 stars and up' }, { value: '4', label: '4 stars and up' }])}
+      </form>
+      <div id="catalogueResults" style="margin-top:12px"><small style="color:var(--mut)">Loading courses…</small></div></section>` +
     `<div class="cards">${academies.map((academy) => `<article class="card pc">
       <div class="im" style="${academy.colour ? `background:linear-gradient(135deg,${esc(academy.colour)},var(--navy))` : ''}">${esc(academy.icon || '🏫')}</div>
       <h3 style="margin:0">${esc(academy.name)}</h3>
@@ -1127,6 +1232,51 @@ PAGES.participant.academies = async (page) => {
     busy(button, true);
     try { await academyDetail(page, button.dataset.academy); } catch (error) { toast(error.message); busy(button, false); }
   }));
+
+  const filters = $('#catalogueFilters');
+  const results = $('#catalogueResults');
+  const loadCourses = async () => {
+    const values = Object.fromEntries(new FormData(filters).entries());
+    const params = new URLSearchParams();
+    Object.entries(values).forEach(([key, value]) => { if (value) params.set(key, value); });
+    try {
+      const list = await api.get(`/courses${params.toString() ? '?' + params.toString() : ''}`);
+      results.innerHTML = list.length ? `<div class="cards">${list.map((course) => `<article class="card pc">
+        <div class="im" style="height:64px;font-size:28px">${esc(course.icon || '📘')}</div>
+        <b>${esc(course.title)}</b>
+        <small style="color:var(--mut)">${esc(course.academyName)} · Level ${course.level} · ${course.durationHours}h · ${esc(course.language.toUpperCase())}</small>
+        <div class="meta"><span>${course.ratingCount ? `★ ${Number(course.ratingAverage).toFixed(1)} (${course.ratingCount})` : 'No ratings yet'}</span>
+          <span>${course.certificateAvailable ? 'Certificate' : 'Completion statement'}</span>
+          <span>${course.lessonCount} lesson(s)</span></div>
+        <div class="pgh">${course.enrolled
+          ? `<button class="btn sm" data-open-course="${esc(course.slug)}">Open course →</button>`
+          : `<button class="btn ghost sm" data-course-info="${esc(course.slug)}">Details</button><button class="btn sm" data-enrol="${course.id}">Enrol</button>`}</div>
+      </article>`).join('')}</div>` : empty('No course matches those filters yet.');
+      $$('[data-open-course]').forEach((button) => button.addEventListener('click', () => {
+        state.courseSlug = button.dataset.openCourse;
+        go('course');
+      }));
+      $$('[data-course-info]').forEach((button) => button.addEventListener('click', () => {
+        state.courseSlug = button.dataset.courseInfo;
+        go('course');
+      }));
+      $$('[data-enrol]').forEach((button) => button.addEventListener('click', async () => {
+        busy(button, true);
+        try {
+          const enrollment = await api.post(`/courses/${button.dataset.enrol}/enrol`);
+          toast('You are enrolled.');
+          state.courseSlug = enrollment.courseSlug;
+          go('course');
+        } catch (error) { toast(error.message); busy(button, false); }
+      }));
+    } catch (error) {
+      results.innerHTML = `<small style="color:var(--bad)">${esc(error.message)}</small>`;
+    }
+  };
+  filters.addEventListener('change', loadCourses);
+  filters.addEventListener('submit', (event) => { event.preventDefault(); loadCourses(); });
+  filters.querySelector('input[name="q"]').addEventListener('input', loadCourses);
+  loadCourses();
 };
 
 async function academyDetail(page, slug) {
@@ -1188,7 +1338,7 @@ PAGES.participant.course = async (page) => {
           <button class="btn ghost sm" data-goto="projects">Open</button></div>` : ''}
       </div>
     </div>` +
-    outline.modules.map((module) => `<section class="card">
+    (outline.modules.map((module) => `<section class="card">
       <h3>${esc(module.icon || '📘')} ${esc(module.name)} <span>${module.percent}%</span></h3>
       ${module.outcome ? `<p style="color:var(--mut);font-size:13px;margin-bottom:8px">${esc(module.outcome)}</p>` : ''}
       ${bar(module.percent)}
@@ -1197,7 +1347,7 @@ PAGES.participant.course = async (page) => {
         <span class="grow"><b>${esc(lesson.title)}</b><small style="display:block;color:var(--mut)">${esc(lesson.type)} · ${lesson.durationMinutes} min</small></span>
         <button class="btn ghost sm" data-lesson="${lesson.id}">${lesson.completed ? 'Review' : 'Open'}</button>
       </label>`).join('') || empty('Lessons are being prepared.')}</div>
-    </section>`).join('') || empty('This course has no lessons yet.');
+    </section>`).join('') || empty('This course has no lessons yet.')) + attributionBlock(outline);
 
   $('[data-back]').addEventListener('click', () => go('academies'));
   $$('[data-goto]').forEach((button) => button.addEventListener('click', () => go(button.dataset.goto)));
@@ -1207,6 +1357,58 @@ PAGES.participant.course = async (page) => {
     busy(enrol, true);
     try { await api.post(`/courses/${enrol.dataset.enrolCourse}/enrol`); toast('You are enrolled.'); go('course'); }
     catch (error) { toast(error.message); busy(enrol, false); }
+  });
+
+  /* Attribution is part of the course page (content-licensing rule). */
+  function attributionBlock(o) {
+    const c = o.course;
+    return `<div class="g g2">
+      <section class="card"><h3>Source, licence and attribution</h3>
+        <p style="margin-top:0">${esc(c.attributionText || 'Attribution is being finalised for this course.')}</p>
+        <div class="meta"><span>${esc(c.sourceName || 'YEP original')}</span><span>${esc(c.licence || '—')}</span>
+          ${c.author ? `<span>${esc(c.author)}</span>` : ''}
+          ${c.instructorName ? `<span>Instructor: ${esc(c.instructorName)}</span>` : ''}</div>
+        <div class="pgh" style="margin-top:10px">
+          ${c.sourceUrl ? `<a class="btn ghost sm" href="${esc(c.sourceUrl)}" target="_blank" rel="noopener">Source</a>` : ''}
+          ${c.licenceUrl ? `<a class="btn ghost sm" href="${esc(c.licenceUrl)}" target="_blank" rel="noopener">Licence</a>` : ''}
+        </div></section>
+      <section class="card"><h3>Ratings and reviews</h3>
+        <div class="on-t">${c.ratingCount ? `★ ${Number(c.ratingAverage).toFixed(1)} from ${c.ratingCount} learner(s)` : 'No ratings yet'}</div>
+        <div id="reviewList" style="margin-top:10px"><small style="color:var(--mut)">Loading reviews…</small></div>
+        ${o.enrolled ? `<form id="reviewForm" style="margin-top:12px">
+          ${sel('Your rating', 'rating', [{ value: '5', label: '5 — Excellent' }, { value: '4', label: '4 — Good' },
+            { value: '3', label: '3 — Fair' }, { value: '2', label: '2 — Weak' }, { value: '1', label: '1 — Poor' }], '5')}
+          ${txt('Comment', 'body', { placeholder: 'What worked and what could improve?' })}
+          <button class="btn sm" type="submit">Save review</button></form>`
+          : '<p style="color:var(--mut)">Enrol to leave a review.</p>'}
+      </section></div>`;
+  }
+
+  const loadReviews = async () => {
+    try {
+      const list = await api.get(`/courses/${encodeURIComponent(state.courseSlug)}/reviews`);
+      const box = $('#reviewList');
+      if (box) {
+        box.innerHTML = list.length ? list.map((review) => `<div class="act">
+          <div class="ic c4">${'★'.repeat(review.rating)}</div>
+          <div class="grow"><b>${esc(review.learnerName)}</b>
+          <small style="display:block;color:var(--mut)">${esc(review.body || 'No comment')} · ${d(review.createdAt)}</small></div></div>`).join('')
+          : '<small style="color:var(--mut)">No reviews yet. Be the first.</small>';
+      }
+    } catch (error) { toast(error.message); }
+  };
+  loadReviews();
+
+  const reviewForm = $('#reviewForm');
+  if (reviewForm) reviewForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const values = vals(event.target);
+    try {
+      await api.post(`/courses/${encodeURIComponent(state.courseSlug)}/reviews`,
+        { rating: Number(values.rating), body: values.body });
+      toast('Review saved.');
+      go('course');
+    } catch (error) { toast(error.message); }
   });
 
   async function openLesson(lessonId) {
@@ -1757,6 +1959,167 @@ async function messagesPage(page) {
 }
 
 PAGES.sponsor.messages = messagesPage;
+
+/* ==================================================== instructor workspace */
+PAGES.instructor.dashboard = async (page) => {
+  const data = await api.get('/dashboard');
+  const numbers = data.stats || {};
+  page.innerHTML = hero('Welcome, Instructor', 'Build lessons, answer learners and follow your course numbers', '', '📘') +
+    stats([['📘', 'c1', numbers.courses ?? 0, 'Courses'], ['🎓', 'c2', numbers.participants ?? 0, 'Learners'],
+      ['🚀', 'c3', numbers.projects ?? 0, 'Impact projects'], ['📅', 'c4', numbers.sessions ?? 0, 'Sessions']]) +
+    card('Course authoring', empty('Open My Courses to add modules and lessons.'),
+      '<button class="lnk" data-goto="courses">My courses →</button>');
+};
+
+const REVIEW_LABELS = { DRAFT: 'Draft', SUBMITTED: 'In review', CHANGES_REQUESTED: 'Changes requested',
+  APPROVED: 'Approved', PUBLISHED: 'Published' };
+const REVIEW_TAGS = { DRAFT: 'Draft', SUBMITTED: 'Review', CHANGES_REQUESTED: 'Rejected',
+  APPROVED: 'Published', PUBLISHED: 'Published' };
+
+PAGES.instructor.courses = async (page) => {
+  const courses = await api.get('/instructor/courses');
+  page.innerHTML = head('My Courses', 'Draft a course, add modules and lessons, then submit it for review',
+    '<button class="btn sm" data-new-course>+ New course</button>') +
+    card('Courses', table(['Course', 'Career path', 'Level', 'Modules', 'Status', 'Actions'], courses.map((course) => [
+      `<strong>${esc(course.title)}</strong><br><small style="color:var(--mut)">${esc(course.code)}</small>`,
+      esc(course.careerPathTitle), `Level ${course.level}`, String(course.moduleCount),
+      tag(REVIEW_TAGS[course.reviewStatus] || course.reviewStatus, REVIEW_LABELS[course.reviewStatus]),
+      `<span class="pgh"><button class="btn ghost sm" data-course-content="${course.id}">Content</button>
+        ${course.reviewStatus === 'DRAFT' || course.reviewStatus === 'CHANGES_REQUESTED'
+          ? `<button class="btn sm" data-submit-course="${course.id}">Submit for review</button>` : ''}</span>`,
+    ])));
+  $$('[data-course-content]').forEach((button) => button.addEventListener('click', () => {
+    state.adminCourseId = Number(button.dataset.courseContent);
+    state.contentBack = 'courses';
+    go('courseContent');
+  }));
+  $$('[data-submit-course]').forEach((button) => button.addEventListener('click', async () => {
+    busy(button, true);
+    try {
+      await api.post(`/instructor/courses/${button.dataset.submitCourse}/submit`);
+      toast('Course submitted for review.');
+      go('courses');
+    } catch (error) { toast(error.message); busy(button, false); }
+  }));
+
+  $('[data-new-course]').addEventListener('click', async () => {
+    let paths = [];
+    try {
+      const tree = await api.get('/instructor/catalogue');
+      paths = tree.flatMap((entry) => entry.careerPaths.map((path) =>
+        ({ value: path.id, label: `${entry.academy.name} · ${path.title}` })));
+    } catch (error) { toast(error.message); return; }
+    modal(`<h3>New course</h3><form id="newCourse" class="fgrid">
+      ${fld('Title', 'title', { required: true })}${fld('Code', 'code', { required: true, placeholder: 'TECH-WEB-L2' })}
+      ${sel('Career path', 'careerPathId', paths)}
+      <div class="fgrid">${sel('Level', 'level', [{ value: 1, label: 'Level One' }, { value: 2, label: 'Level Two' }], 1)}
+        ${fld('Duration (hours)', 'durationHours', { type: 'number', min: 0, value: 20 })}
+        ${sel('Language', 'language', [{ value: 'en', label: 'English' }, { value: 'sw', label: 'Kiswahili' }, { value: 'fr', label: 'French' }], 'en')}</div>
+      ${fld('Summary', 'summary', { placeholder: 'One line for the catalogue' })}
+      ${txt('Description', 'description')}
+      <h3 style="grid-column:1/-1;margin:8px 0 0">Attribution (required before submission)</h3>
+      ${fld('Source', 'sourceName', { required: true, placeholder: 'OpenStax — Entrepreneurship' })}
+      ${fld('Source URL', 'sourceUrl', { placeholder: 'https://…' })}
+      <div class="fgrid">${fld('Licence', 'licence', { required: true, placeholder: 'CC BY 4.0' })}
+        ${fld('Licence URL', 'licenceUrl', { placeholder: 'https://creativecommons.org/…' })}</div>
+      ${fld('Author', 'author', { required: true, placeholder: 'Original author or organisation' })}
+      ${txt('Attribution text', 'attributionText', { required: true, placeholder: 'How credit is given on the course page' })}
+      <label class="row"><span>Verified certificate available</span><input type="checkbox" name="certificateAvailable" checked></label>
+      <div class="pgh" style="grid-column:1/-1"><button class="btn" type="submit">Create draft</button>
+        <button class="btn ghost" type="button" data-close>Cancel</button></div></form>`);
+    $('[data-close]').addEventListener('click', closeModal);
+    $('#newCourse').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const values = vals(event.target);
+      const payload = {
+        careerPathId: Number(values.careerPathId), code: values.code, title: values.title,
+        summary: values.summary, description: values.description, level: Number(values.level),
+        durationHours: Number(values.durationHours || 0), language: values.language,
+        certificateAvailable: values.certificateAvailable === 'on',
+        sourceName: values.sourceName, sourceUrl: values.sourceUrl, licence: values.licence,
+        licenceUrl: values.licenceUrl, author: values.author, attributionText: values.attributionText,
+      };
+      try {
+        const created = await api.post('/instructor/courses', payload);
+        closeModal(); toast('Draft created. Add modules and lessons, then submit it.');
+        state.adminCourseId = created.id;
+        state.contentBack = 'courses';
+        go('courseContent');
+      } catch (error) { toast(error.message); }
+    });
+  });
+};
+
+/* ======================================================= reviewer workspace */
+PAGES.reviewer.dashboard = async (page) => {
+  const data = await api.get('/dashboard');
+  const numbers = data.stats || {};
+  page.innerHTML = hero('Welcome, Reviewer', 'Check quality, licensing and accessibility before publication', '', '🔎') +
+    stats([['📘', 'c1', numbers.courses ?? 0, 'Courses'], ['👩‍🏫', 'c2', numbers.instructors ?? 0, 'Instructors'],
+      ['🎓', 'c3', numbers.participants ?? 0, 'Learners'], ['🏅', 'c4', numbers.certificates ?? 0, 'Certificates']]) +
+    card('Review queue', empty('Open the Review Queue to inspect course outlines and lesson content.'),
+      '<button class="lnk" data-goto="courses">Review queue →</button>');
+};
+
+PAGES.reviewer.courses = async (page) => {
+  const [courses, queue] = await Promise.all([
+    api.get('/reviewer/courses'), api.get('/reviewer/submissions').catch(() => []),
+  ]);
+  page.innerHTML = head('Review Queue', 'Approve submissions, ask for changes and inspect published outlines') +
+    card('Waiting for a decision', queue.length ? table(['Course', 'Instructor', 'Modules', 'Status', 'Decision'], queue.map((course) => [
+      `<strong>${esc(course.title)}</strong><br><small style="color:var(--mut)">${esc(course.code)}</small>`,
+      esc(course.instructorName || 'Unassigned'), String(course.moduleCount),
+      tag(REVIEW_TAGS[course.reviewStatus] || course.reviewStatus, REVIEW_LABELS[course.reviewStatus]),
+      `<span class="pgh"><button class="btn ok sm" data-approve="${course.id}">Approve</button>
+        <button class="btn bad sm" data-changes="${course.id}">Request changes</button></span>`,
+    ]), false) : empty('Nothing waiting for review.')) +
+    card('All courses', table(['Course', 'Career path', 'Level', 'Modules', 'Status', 'Actions'], courses.map((course) => [
+      `<strong>${esc(course.title)}</strong><br><small style="color:var(--mut)">${esc(course.code)}</small>`,
+      esc(course.careerPathTitle), `Level ${course.level}`, String(course.moduleCount),
+      tag(course.published ? 'Published' : 'Draft'),
+      `<button class="btn ghost sm" data-outline="${course.id}">View outline</button>`,
+    ])));
+  $$('[data-outline]').forEach((button) => button.addEventListener('click', async () => {
+    try {
+      const outline = await api.get(`/content/courses/${button.dataset.outline}/outline`);
+      modal(`<h3>${esc(outline.course.title)}</h3>
+        <p style="color:var(--mut)">${esc(outline.course.summary || '')}</p>
+        ${outline.modules.map((module) => `<div class="act"><div class="ic c1">${esc(module.icon || '📘')}</div>
+          <div class="grow"><b>${esc(module.name)}</b><small>${module.lessons.length} lesson(s) · ${esc(module.outcome || '')}</small></div></div>`).join('')
+          || empty('This course has no modules yet.')}
+        <div class="pgh"><button class="btn ghost" type="button" data-close>Close</button></div>`);
+      $('[data-close]').addEventListener('click', closeModal);
+    } catch (error) { toast(error.message); }
+  }));
+
+  const decide = async (courseId, decision, label) => {
+    const note = prompt(`${label} — optional note for the instructor`);
+    if (note === null) return;
+    try {
+      await api.post(`/reviewer/submissions/${courseId}/decision`, { decision, note });
+      toast(decision === 'APPROVE' ? 'Course approved and published.' : 'Changes requested.');
+      go('courses');
+    } catch (error) { toast(error.message); }
+  };
+  $$('[data-approve]').forEach((button) => button.addEventListener('click',
+    () => decide(button.dataset.approve, 'APPROVE', 'Approve course')));
+  $$('[data-changes]').forEach((button) => button.addEventListener('click',
+    () => decide(button.dataset.changes, 'CHANGES', 'Request changes')));
+};
+
+/* ======================================================= employer workspace */
+PAGES.employer.dashboard = async (page) => {
+  const data = await api.get('/dashboard');
+  const numbers = data.stats || {};
+  page.innerHTML = hero('Welcome, Employer', 'Hire verified young talent from across Africa', '', '🏢') +
+    stats([['👥', 'c1', numbers.approvedParticipants ?? 0, 'Verified learners'],
+      ['🏅', 'c2', numbers.certificates ?? 0, 'Certificates earned'],
+      ['🚀', 'c3', numbers.projects ?? 0, 'Impact projects'], ['📘', 'c4', numbers.courses ?? 0, 'Courses']]) +
+    card('Opportunities', `<p style="color:var(--mut)">Your organisation account is ready. The job, internship and tender board opens in the next
+      phase; learners' verified certificates and Level Two projects will be searchable there.</p>`);
+};
+
+PAGES.instructor.courseContent = PAGES.admin.courseContent;
 
 /* ================================================================ router */
 let delegated = false;

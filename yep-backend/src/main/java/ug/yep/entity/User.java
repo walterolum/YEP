@@ -41,6 +41,9 @@ public abstract class User extends BaseEntity {
     @Column(name = "phone", length = 40)
     private String phone;
 
+    @Column(name = "phone_country_code", length = 8)
+    private String phoneCountryCode;
+
     @Column(name = "password_hash", nullable = false, length = 100)
     private String passwordHash;
 
@@ -53,6 +56,9 @@ public abstract class User extends BaseEntity {
 
     @Column(name = "country", length = 80)
     private String country;
+
+    @Column(name = "country_code", length = 2)
+    private String countryCode;
 
     @Column(name = "district", length = 80)
     private String district;
@@ -138,6 +144,9 @@ public abstract class User extends BaseEntity {
             case FACILITATOR -> new Facilitator(fullName, email, phone, passwordHash, status);
             case SPONSOR -> new Sponsor(fullName, email, phone, passwordHash, status);
             case PARTICIPANT -> new Participant(fullName, email, phone, passwordHash, status);
+            case INSTRUCTOR -> new Instructor(fullName, email, phone, passwordHash, status);
+            case EMPLOYER -> new Employer(fullName, email, phone, passwordHash, status);
+            case REVIEWER -> new Reviewer(fullName, email, phone, passwordHash, status);
         };
     }
 
@@ -168,6 +177,18 @@ public abstract class User extends BaseEntity {
         return false;
     }
 
+    public boolean canAuthorContent() {
+        return false;
+    }
+
+    public boolean canReviewContent() {
+        return false;
+    }
+
+    public boolean canHire() {
+        return false;
+    }
+
     /** Role constant owned by the concrete account class (discriminator column). */
     public abstract Enums.Role getRole();
 
@@ -185,6 +206,33 @@ public abstract class User extends BaseEntity {
 
     public void changeStatus(Enums.UserStatus status) {
         this.status = status;
+    }
+
+    /** Stores the contact block captured at registration: dial code, number, country code and name. */
+    public void applyContact(String phoneCountryCode, String phone, String countryCode, String country) {
+        this.phoneCountryCode = trimmed(phoneCountryCode);
+        if (phone != null) {
+            this.phone = trimmed(phone);
+        }
+        this.countryCode = trimmed(countryCode) == null ? null : countryCode.trim().toUpperCase(java.util.Locale.ROOT);
+        if (country != null && !country.isBlank()) {
+            this.country = country.trim();
+        }
+    }
+
+    public void markEmailVerified() {
+        if (this.emailVerifiedAt == null) {
+            this.emailVerifiedAt = Instant.now();
+        }
+    }
+
+    /** E.164-style display of the stored number. */
+    public String getPhoneWithDialCode() {
+        if (phone == null || phone.isBlank()) {
+            return null;
+        }
+        return phoneCountryCode == null || phoneCountryCode.isBlank()
+                ? phone : phoneCountryCode + " " + phone;
     }
 
     public void updateProfile(String fullName, String phone, String country, String district,
@@ -300,6 +348,14 @@ public abstract class User extends BaseEntity {
 
     public String getPhone() {
         return phone;
+    }
+
+    public String getPhoneCountryCode() {
+        return phoneCountryCode;
+    }
+
+    public String getCountryCode() {
+        return countryCode;
     }
 
     public String getPasswordHash() {

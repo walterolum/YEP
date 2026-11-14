@@ -30,6 +30,16 @@ public class SettingsService {
         }
     }
 
+    public boolean flag(String key, boolean fallback) {
+        String raw = value(key, String.valueOf(fallback)).trim();
+        return "true".equalsIgnoreCase(raw) || "1".equals(raw);
+    }
+
+    /** Email verification blocks sign-in only when the deployment turns it on. */
+    public boolean requireEmailVerification() {
+        return flag("require_email_verification", false);
+    }
+
     public Map<String, String> all() {
         Map<String, String> map = new LinkedHashMap<>();
         settings.findAll().forEach(setting -> map.put(setting.getKey(), setting.getValue()));

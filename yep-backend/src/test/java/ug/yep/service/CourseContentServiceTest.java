@@ -86,8 +86,9 @@ class CourseContentServiceTest {
 
     @Test
     void aLessonWithCompletionsCannotBeDeleted() {
-        User admin = mock(User.class);
-        when(admin.getRole()).thenReturn(Enums.Role.ADMIN);
+        User admin = User.create(Enums.Role.ADMIN, "Admin", "admin@yep.example", null, "x",
+                Enums.UserStatus.APPROVED);
+        ReflectionTestUtils.setField(admin, "id", 1L);
         when(users.findById(1L)).thenReturn(Optional.of(admin));
         Lesson lesson = mock(Lesson.class);
         when(lesson.getTitle()).thenReturn("Evidence lesson");
@@ -99,8 +100,9 @@ class CourseContentServiceTest {
 
     @Test
     void aModuleWithLessonsCannotBeDeleted() {
-        User admin = mock(User.class);
-        when(admin.getRole()).thenReturn(Enums.Role.ADMIN);
+        User admin = User.create(Enums.Role.ADMIN, "Admin", "admin@yep.example", null, "x",
+                Enums.UserStatus.APPROVED);
+        ReflectionTestUtils.setField(admin, "id", 1L);
         when(users.findById(1L)).thenReturn(Optional.of(admin));
         Module module = mock(Module.class);
         when(module.getName()).thenReturn("Module with lessons");

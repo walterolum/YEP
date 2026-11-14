@@ -1,8 +1,8 @@
 # Roles and permissions matrix (Phase 1)
 
-Roles in `yep-backend`: `ADMIN`, `PARTICIPANT`, `MENTOR`, `FACILITATOR`, `SPONSOR` (Phase 3 adds
-`EMPLOYER`; Phase 4 may add employer/university/partner variants). Self-registration creates
-`PARTICIPANT` only; every other role is created by an administrator.
+Roles in `yep-backend`: `ADMIN`, `PARTICIPANT`, `MENTOR`, `FACILITATOR`, `SPONSOR`, `INSTRUCTOR`,
+`EMPLOYER`, `REVIEWER` (the last three added in Phase 1). Self-registration creates `PARTICIPANT`
+only; every other role is created by an administrator.
 
 Legend: **✔** allowed · **—** not allowed · **own** limited to the caller's own records.
 
@@ -105,6 +105,23 @@ in `settings` as `overall_weight_lessons`, `overall_weight_assessments`, `overal
 
 ---
 
+## 4b. Instructor, reviewer and employer workspaces (Phase 1)
+
+| Capability | ADMIN | INSTRUCTOR | REVIEWER | EMPLOYER |
+|---|---|---|---|---|
+| Own role dashboard (`GET /api/dashboard`) | ✔ | ✔ | ✔ | ✔ |
+| List courses for authoring (`GET /api/instructor/courses`) | ✔ | ✔ | — | — |
+| Open a course outline (`GET /api/content/courses/{id}/outline`) | ✔ | ✔ | ✔ (read-only) | — |
+| Create/edit/delete modules and lessons (`/api/content/**`) | ✔ | ✔ | — | — |
+| Review queue (`GET /api/reviewer/courses`) | ✔ | — | ✔ | — |
+| Workplace statistics | ✔ | own | own | own |
+| Administrator console (`/api/admin/**`) | ✔ | — | — | — |
+
+Capabilities are polymorphic on the account class (`canAuthorContent`, `canReviewContent`, `canHire`)
+and re-checked in `CourseContentService`, so URL rules and service rules agree even after a role change.
+
+---
+
 ## 5. Route map
 
 | Route prefix | Required authority |
@@ -117,4 +134,21 @@ in `settings` as `overall_weight_lessons`, `overall_weight_assessments`, `overal
 | `/api/facilitator/**` | `ROLE_ADMIN`, `ROLE_FACILITATOR` |
 | `/api/mentor/**` | `ROLE_ADMIN`, `ROLE_MENTOR` |
 | `/api/sponsor/**` | `ROLE_ADMIN`, `ROLE_SPONSOR` |
+| `/api/instructor/**` | `ROLE_ADMIN`, `ROLE_INSTRUCTOR` |
+| `/api/reviewer/**` | `ROLE_ADMIN`, `ROLE_REVIEWER` |
+| `/api/employer/**` | `ROLE_ADMIN`, `ROLE_EMPLOYER` |
+| `GET /api/content/**` | `ROLE_ADMIN`, `ROLE_FACILITATOR`, `ROLE_INSTRUCTOR`, `ROLE_REVIEWER` |
+| Other `/api/content/**` | `ROLE_ADMIN`, `ROLE_FACILITATOR`, `ROLE_INSTRUCTOR` |
+| `POST /api/auth/resend-verification` | any signed-in account |
+| `POST /api/courses/{slug}/reviews` | enrolled participant (403 otherwise) |
+| `GET /api/courses/{slug}/reviews` | anonymous |
+
+## 6. Content authorship and publication
+
+* **INSTRUCTOR** creates attributed course drafts and owns them; only the owning instructor (or an admin) may
+  edit or submit them.
+* **REVIEWER** approves or requests changes on submitted courses. A reviewer may never decide a course they
+  authored. Approval publishes the course; nothing else can.
+* Every course must carry source, licence, author and attribution text before it can be submitted, and that
+  text is displayed publicly with the course.
 | Everything else | authenticated |

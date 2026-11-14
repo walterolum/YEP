@@ -40,4 +40,19 @@ public class Admin extends User {
     public boolean canSponsor() {
         return true;
     }
+
+    @Override
+    public boolean canAuthorContent() {
+        return true;
+    }
+
+    @Override
+    public boolean canReviewContent() {
+        return true;
+    }
+
+    @Override
+    public boolean canHire() {
+        return true;
+    }
 }

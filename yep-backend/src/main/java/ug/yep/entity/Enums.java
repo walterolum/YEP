@@ -6,11 +6,15 @@ public final class Enums {
     private Enums() {
     }
 
-    public enum Role { ADMIN, PARTICIPANT, MENTOR, FACILITATOR, SPONSOR }
+    public enum Role { ADMIN, PARTICIPANT, MENTOR, FACILITATOR, SPONSOR,
+        INSTRUCTOR, EMPLOYER, REVIEWER }
 
     public enum UserStatus { PENDING, APPROVED, SUSPENDED, REJECTED }
 
     public enum Level { LEVEL_ONE, LEVEL_TWO }
+
+    /** Instructors draft and submit; reviewers approve or ask for changes. */
+    public enum ReviewStatus { DRAFT, SUBMITTED, CHANGES_REQUESTED, APPROVED, PUBLISHED }
 
     public enum ApplicationStatus { PENDING, APPROVED, REJECTED }
 

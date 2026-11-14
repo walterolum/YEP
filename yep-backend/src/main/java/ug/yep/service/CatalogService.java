@@ -85,8 +85,22 @@ public class CatalogService {
     @Transactional(readOnly = true)
     public List<Views.CourseView> searchCourses(String academySlug, Integer level, String query,
                                                 Long userId) {
+        return searchCourses(academySlug, level, query, null, null, null, null, userId);
+    }
+
+    /**
+     * Catalogue search. Every filter is optional; ratings use the denormalised average so a
+     * filter never triggers a per-course query.
+     */
+    @Transactional(readOnly = true)
+    public List<Views.CourseView> searchCourses(String academySlug, Integer level, String query,
+                                                String language, Integer maxHours,
+                                                Boolean certificateOnly, Integer minRating,
+                                                Long userId) {
         String needle = query == null ? null : query.trim().toLowerCase(Locale.ROOT);
         String slug = academySlug == null ? null : academySlug.trim().toLowerCase(Locale.ROOT);
+        String lang = language == null || language.isBlank()
+                ? null : language.trim().toLowerCase(Locale.ROOT);
         List<Views.CourseView> views = new ArrayList<>();
         for (Course course : courses.findByPublishedTrueOrderBySortOrderAscTitleAsc()) {
             if (slug != null && !slug.isBlank()
@@ -94,6 +108,18 @@ public class CatalogService {
                 continue;
             }
             if (level != null && course.getLevel() != level) {
+                continue;
+            }
+            if (lang != null && !lang.equals(course.getLanguage())) {
+                continue;
+            }
+            if (maxHours != null && course.getDurationHours() > maxHours) {
+                continue;
+            }
+            if (Boolean.TRUE.equals(certificateOnly) && !course.isCertificateAvailable()) {
+                continue;
+            }
+            if (minRating != null && course.getRatingAverage() < minRating) {
                 continue;
             }
             if (needle != null && !needle.isBlank()
@@ -106,6 +132,25 @@ public class CatalogService {
             views.add(courseView(course, userId));
         }
         return views;
+    }
+
+    /** Public syllabus: module headings with lesson titles, no learner data. */
+    @Transactional(readOnly = true)
+    public Views.SyllabusView syllabus(String slug) {
+        Course course = courses.findBySlug(slug)
+                .filter(Course::isPublished)
+                .orElseThrow(() -> new NotFoundException("Course"));
+        List<Views.SyllabusModuleView> moduleViews = new ArrayList<>();
+        for (Module module : modules.findByCourseIdOrderBySortOrderAsc(course.getId())) {
+            List<Views.SyllabusLessonView> lessonViews = lessons
+                    .findByModuleIdOrderBySortOrderAsc(module.getId()).stream()
+                    .map(lesson -> new Views.SyllabusLessonView(lesson.getId(), lesson.getTitle(),
+                            lesson.getType().name(), lesson.getDurationMinutes()))
+                    .toList();
+            moduleViews.add(new Views.SyllabusModuleView(module.getId(), module.getName(),
+                    module.getIcon(), module.getOutcome(), lessonViews));
+        }
+        return new Views.SyllabusView(courseView(course, null), moduleViews);
     }
 
     @Transactional(readOnly = true)
@@ -348,7 +393,12 @@ public class CatalogService {
                 course.getCareerPath().getAcademy().getName(), course.getCode(), course.getTitle(),
                 course.getSlug(), course.getSummary(), course.getDescription(), course.getLevel(),
                 course.getDurationHours(), course.getIcon(), courseModules.size(), lessonCount,
-                course.isPublished(), enrolled);
+                course.isPublished(), enrolled, course.getLanguage(), course.isCertificateAvailable(),
+                course.getSourceName(), course.getSourceUrl(), course.getLicence(),
+                course.getLicenceUrl(), course.getAuthor(), course.getAttributionText(),
+                course.getInstructor() == null ? null : course.getInstructor().getFullName(),
+                course.getReviewStatus().name(), course.getReviewNote(),
+                course.getRatingAverage(), course.getRatingCount());
     }
 
     // ------------------------------------------------------------------ helpers

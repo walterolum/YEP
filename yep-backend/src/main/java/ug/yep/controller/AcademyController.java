@@ -42,14 +42,24 @@ public class AcademyController {
     public List<Views.CourseView> courses(@RequestParam(required = false) String academy,
                                           @RequestParam(required = false) Integer level,
                                           @RequestParam(required = false) String q,
+                                          @RequestParam(required = false) String language,
+                                          @RequestParam(required = false) Integer maxHours,
+                                          @RequestParam(required = false) Boolean certificate,
+                                          @RequestParam(required = false) Integer minRating,
                                           @AuthenticationPrincipal CurrentUser actor) {
-        return catalog.searchCourses(academy, level, q, actor == null ? null : actor.id());
+        return catalog.searchCourses(academy, level, q, language, maxHours, certificate,
+                minRating, actor == null ? null : actor.id());
     }
 
     @GetMapping("/courses/{slug}")
     public Views.CourseView course(@PathVariable String slug,
                                    @AuthenticationPrincipal CurrentUser actor) {
         return catalog.courseDetail(slug, actor == null ? null : actor.id());
+    }
+
+    @GetMapping("/courses/{slug}/syllabus")
+    public Views.SyllabusView syllabus(@PathVariable String slug) {
+        return catalog.syllabus(slug);
     }
 
     @GetMapping("/me/enrollments")

@@ -9,19 +9,32 @@ export interface TabItem {
   count?: number;
 }
 
+/**
+ * `items` accepts [value, label] pairs expressed as objects or as plain strings.
+ * Plain strings are normalised to `{ id, label }` — they must never be spread,
+ * which is what turned a tab label into "v e / i l / o r".
+ */
+export type TabInput = TabItem | string;
+
+function normaliseTabs(items: TabInput[]): TabItem[] {
+  return (items ?? []).map((item) => (typeof item === 'string' ? { id: item, label: item } : item));
+}
+
 export function Tabs({
-  items,
+  items: rawItems,
   active,
   onChange,
   ariaLabel,
   className,
 }: {
-  items: TabItem[];
+  items: TabInput[];
   active: string;
   onChange: (id: string) => void;
   ariaLabel: string;
   className?: string;
 }) {
+  const items = normaliseTabs(rawItems);
+
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     const index = items.findIndex((item) => item.id === active);
     if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
