@@ -36,7 +36,8 @@ class LearningControllerTest {
     void setUp() {
         learning = mock(LearningService.class);
         discussions = mock(DiscussionService.class);
-        mvc = MockMvcBuilders.standaloneSetup(new LearningController(learning, discussions))
+        mvc = MockMvcBuilders.standaloneSetup(new LearningController(learning, discussions,
+                        mock(ug.yep.service.LearningExperienceService.class)))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(

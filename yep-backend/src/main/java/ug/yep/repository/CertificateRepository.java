@@ -17,5 +17,11 @@ public interface CertificateRepository extends JpaRepository<Certificate, Long> 
 
     List<Certificate> findAllByOrderByIssuedAtDesc();
 
+    Optional<Certificate> findFirstByUserIdOrderByIssuedAtDesc(Long userId);
+
+    Optional<Certificate> findByUserIdAndScopeAndScopeId(Long userId, String scope, Long scopeId);
+
+    boolean existsByUserIdAndScopeAndScopeId(Long userId, String scope, Long scopeId);
+
     long countByIssuedAtAfter(java.time.Instant after);
 }

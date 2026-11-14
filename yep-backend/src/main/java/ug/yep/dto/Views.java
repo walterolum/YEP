@@ -291,6 +291,44 @@ public final class Views {
     public record PathScoreView(Long careerPathId, String title, int percent, int overallScore) {
     }
 
+    public record NoteView(Long lessonId, String body, Instant updatedAt) {
+    }
+
+    public record LessonPostView(Long id, String author, String role, String body, Instant createdAt) {
+    }
+
+    public record PracticeQuestionView(Long id, String prompt, List<String> options) {
+    }
+
+    public record PracticeResultView(boolean correct, String correctOption, int masteryPercent) {
+    }
+
+    public record MasteryView(Long courseId, int attempted, int correct, int percent) {
+    }
+
+    public record CodingExerciseView(Long id, String title, String language, String instructions,
+                                     String starterCode, String lastStatus, int points) {
+    }
+
+    public record CodeRunView(String status, int score, String output) {
+    }
+
+    public record AttemptView(Long id, Long assessmentId, Instant startedAt, Instant deadline,
+                              String status, int minutes) {
+    }
+
+    public record BadgeView(String code, String title, String icon, boolean earned) {
+    }
+
+    public record LearningProfileView(int xp, int lessonsCompleted, int practiceAnswered,
+                                      int practiceCorrect, List<BadgeView> badges) {
+    }
+
+    public record LessonExtrasView(NoteView note, List<LessonPostView> posts,
+                                   List<PracticeQuestionView> practice, CodingExerciseView exercise,
+                                   LearningProfileView profile) {
+    }
+
     public record EnrollmentView(Long id, Long courseId, String courseTitle, String courseSlug,
                                  String status, Instant enrolledAt, Instant completedAt) {
 

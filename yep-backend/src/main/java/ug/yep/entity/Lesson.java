@@ -34,6 +34,34 @@ public class Lesson extends BaseEntity {
     @Column(name = "duration_minutes", nullable = false)
     private int durationMinutes;
 
+    @Column(name = "video_url", length = 500)
+    private String videoUrl;
+
+    @Column(name = "transcript", columnDefinition = "text")
+    private String transcript;
+
+    @Column(name = "captions_url", length = 500)
+    private String captionsUrl;
+
+    /** Attach licensed media and its transcript to a lesson. */
+    public void setVideo(String videoUrl, String transcript, String captionsUrl) {
+        this.videoUrl = videoUrl;
+        this.transcript = transcript;
+        this.captionsUrl = captionsUrl;
+    }
+
+    public String getVideoUrl() {
+        return videoUrl;
+    }
+
+    public String getTranscript() {
+        return transcript;
+    }
+
+    public String getCaptionsUrl() {
+        return captionsUrl;
+    }
+
     protected Lesson() {
     }
 

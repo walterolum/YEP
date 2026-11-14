@@ -135,10 +135,13 @@ class AssessmentServiceTest {
     }
 
     @Test
-    void refusesSecondSubmission() {
+    void allowsARetakeWhileResultsAreUnpublished() {
         when(submissions.findByAssessmentIdAndUserId(1L, 2L))
                 .thenReturn(Optional.of(new Submission(assessment, participant)));
 
-        assertThrows(BusinessRuleException.class, () -> service.submit(2L, 1L, answers("B", "C")));
+        service.submit(2L, 1L, answers("B", "C"));
+
+        org.mockito.Mockito.verify(submissions, org.mockito.Mockito.times(1))
+                .save(org.mockito.ArgumentMatchers.any(Submission.class));
     }
 }

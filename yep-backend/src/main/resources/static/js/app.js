@@ -119,7 +119,8 @@ const NAV = {
     ['certificates', 'Certificates', '🏅'], ['reports', 'Reports', '📈'], ['settings', 'Settings', '⚙️']],
   participant: [['dashboard', 'Dashboard', '▦'], ['profile', 'My Profile', '👤'], ['programmes', 'Programmes', '📚'],
     ['academies', 'Academies', '🏫'], ['learning', 'Learning Hub', '🎓'], ['projects', 'My Projects', '🚀'], ['sessions', 'Sessions & Events', '📅'],
-    ['assessments', 'Assessments', '📝'], ['certificates', 'Certificates', '🏅'], ['notifications', 'Notifications', '🔔']],
+    ['assessments', 'Assessments', '📝'], ['certificates', 'Certificates', '🏅'], ['jobs', 'Jobs & Portfolio', '💼'],
+    ['notifications', 'Notifications', '🔔']],
   mentor: [['dashboard', 'Dashboard', '▦'], ['mentees', 'My Mentees', '👥'], ['requests', 'Mentorship Requests', '📨'],
     ['sessions', 'Sessions', '📅'], ['resources', 'Resources', '📁'], ['reports', 'Reports', '📈']],
   facilitator: [['dashboard', 'Dashboard', '▦'], ['programmes', 'Programmes', '📚'], ['sessions', 'Sessions', '📅'],
@@ -128,7 +129,7 @@ const NAV = {
     ['impact', 'Impact Reports', '📈'], ['partnerships', 'Partnerships', '🏢'], ['messages', 'Messages', '💬']],
   instructor: [['dashboard', 'Dashboard', '▦'], ['courses', 'My Courses', '📘'], ['sessions', 'Sessions', '📅']],
   reviewer: [['dashboard', 'Dashboard', '▦'], ['courses', 'Review Queue', '🔎']],
-  employer: [['dashboard', 'Dashboard', '▦']],
+  employer: [['dashboard', 'Dashboard', '▦'], ['jobs', 'Jobs & Applicants', '💼']],
 };
 
 const PAGES = {
@@ -1414,14 +1415,52 @@ PAGES.participant.course = async (page) => {
   async function openLesson(lessonId) {
     try {
       const lesson = await api.get(`/learning/lessons/${lessonId}`);
+      const extras = await api.get(`/learning/lessons/${lessonId}/extras`).catch(() => null);
       modal(`<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
           <div><h3 style="margin:0">${esc(lesson.title)}</h3>
           <small style="color:var(--mut)">${esc(lesson.moduleName)} · ${esc(lesson.type)} · ${lesson.durationMinutes} min</small></div>
           <button class="btn ghost sm" data-close>Close</button></div>
         <div class="lesson-body">${esc(lesson.content || 'Lesson notes will appear here.')}</div>
         <button class="btn ${lesson.completed ? 'ghost' : ''}" data-complete="${lesson.id}" data-done="${lesson.completed}">
-          ${lesson.completed ? 'Mark as not completed' : 'Mark lesson complete'}</button>`);
+          ${lesson.completed ? 'Mark as not completed' : 'Mark lesson complete'}</button>
+        ${extras ? `<section class="card" style="margin-top:14px"><h3>Your notes</h3>
+          <form id="noteForm"><textarea name="body" rows="4" style="width:100%">${esc(extras.note.body || '')}</textarea>
+          <button class="btn ghost sm" type="submit" style="margin-top:8px">Save note</button></form></section>
+        ${extras.practice.length ? `<section class="card"><h3>Practice</h3>
+          ${extras.practice.map((q) => `<div style="margin-bottom:10px"><b>${esc(q.prompt)}</b>
+            <div class="pgh">${q.options.map((option, index) => `<button class="btn ghost sm" data-practice="${q.id}"
+              data-choice="${String.fromCharCode(65 + index)}">${esc(option)}</button>`).join('')}</div></div>`).join('')}
+          <small id="practiceResult" style="color:var(--mut)"></small></section>` : ''}
+        <section class="card"><h3>Questions & answers <span>${extras.posts.length}</span></h3>
+          <div id="lessonPosts">${extras.posts.length ? extras.posts.map((post) => `<div class="act">
+            <div class="ic c3">${esc(post.author.slice(0, 1))}</div>
+            <div class="grow"><b>${esc(post.author)}</b><small style="display:block">${esc(post.body)}</small></div></div>`).join('')
+            : '<small style="color:var(--mut)">No questions yet. Ask the first one.</small>'}</div>
+          <form id="postForm" style="margin-top:10px"><textarea name="body" rows="2" style="width:100%" placeholder="Ask a question about this lesson"></textarea>
+          <button class="btn ghost sm" type="submit" style="margin-top:8px">Post</button></form></section>` : ''}`);
       $('[data-close]').addEventListener('click', closeModal);
+      if (extras) {
+        $('#noteForm').addEventListener('submit', async (event) => {
+          event.preventDefault();
+          try { await api.put(`/learning/lessons/${lessonId}/note`, { body: event.target.body.value }); toast('Note saved.'); }
+          catch (error) { toast(error.message); }
+        });
+        $('#postForm').addEventListener('submit', async (event) => {
+          event.preventDefault();
+          try {
+            await api.post(`/learning/lessons/${lessonId}/posts`, { body: event.target.body.value });
+            openLesson(lessonId);
+          } catch (error) { toast(error.message); }
+        });
+        $$('[data-practice]').forEach((button) => button.addEventListener('click', async () => {
+          try {
+            const result = await api.post(`/learning/lessons/${lessonId}/practice`,
+              { questionId: Number(button.dataset.practice), choice: button.dataset.choice });
+            $('#practiceResult').textContent = (result.correct ? 'Correct. ' : 'Not quite. ')
+              + `Mastery ${result.masteryPercent}%. Correct answer: ${result.correctOption}.`;
+          } catch (error) { toast(error.message); }
+        }));
+      }
       $('[data-complete]').addEventListener('click', async (event) => {
         const id = event.currentTarget.dataset.complete;
         const done = event.currentTarget.dataset.done === 'true';
@@ -2133,6 +2172,119 @@ function delegate() {
     go(target.dataset.goto);
   });
 }
+
+/* ------------------------------------------------ jobs, applications, portfolio */
+PAGES.participant.jobs = async (page) => {
+  const [jobs, applications, portfolio] = await Promise.all([
+    api.get('/jobs').catch(() => []), api.get('/me/job-applications').catch(() => []),
+    api.get('/me/portfolio').catch(() => []),
+  ]);
+  page.innerHTML = head('Jobs & portfolio', 'Apply to opportunities and show the work you have done') +
+    card('Open opportunities', jobs.length ? table(['Role', 'Organisation', 'Location', 'Mode', 'Closes', 'Actions'], jobs.map((job) => [
+      `<strong>${esc(job.title)}</strong><br><small style="color:var(--mut)">${esc(job.skills || '')}</small>`,
+      esc(job.organisation), esc(job.location), esc(job.workMode),
+      job.closesAt ? d(job.closesAt) : 'Open',
+      `<span class="pgh"><button class="btn ghost sm" data-view-job="${job.id}">Details</button>
+        <button class="btn sm" data-apply="${job.id}">Apply</button></span>`,
+    ])) : empty('No open opportunities yet. Check back soon.')) +
+    card('My applications', applications.length ? table(['Role', 'Organisation', 'Status', 'Applied'], applications.map((row) => [
+      esc(row.title), esc(row.organisation), tag(row.status === 'HIRED' ? 'Published' : row.status === 'REJECTED' ? 'Rejected' : 'Review', row.status), d(row.createdAt),
+    ])) : empty('You have not applied to anything yet.')) +
+    card('My portfolio', `<form id="portfolioForm" class="fgrid">
+      ${fld('Title', 'title', { required: true })}
+      ${sel('Type', 'type', [{ value: 'PROJECT', label: 'Project' }, { value: 'CERTIFICATE', label: 'Certificate' },
+        { value: 'WRITING', label: 'Writing' }, { value: 'CODE', label: 'Code' }])}
+      ${fld('Link', 'url', { placeholder: 'https://github.com/…' })}
+      ${txt('Description', 'description')}
+      <div class="pgh"><button class="btn sm" type="submit">Add to portfolio</button></div></form>
+      <div style="margin-top:12px">${portfolio.length ? portfolio.map((item) => `<div class="act">
+        <div class="ic c1">📁</div><div class="grow"><b>${esc(item.title)}</b>
+        <small style="display:block;color:var(--mut)">${esc(item.type)} · ${esc(item.description || '')}</small></div>
+        ${item.url ? `<a class="btn ghost sm" href="${esc(item.url)}" target="_blank" rel="noopener">Open</a>` : ''}
+        <button class="btn ghost sm" data-remove-portfolio="${item.id}">Remove</button></div>`).join('') : empty('Add your first piece of work.')}</div>`);
+
+  $$('[data-apply]').forEach((button) => button.addEventListener('click', () => {
+    const job = jobs.find((row) => String(row.id) === button.dataset.apply);
+    modal(`<h3>Apply: ${esc(job.title)}</h3><p style="color:var(--mut)">${esc(job.organisation)} · ${esc(job.location)}</p>
+      <p>${esc(job.description)}</p>
+      <form id="applyForm">${txt('Why you are a good fit', 'coverNote', { required: true })}
+      <div class="pgh"><button class="btn" type="submit">Send application</button>
+        <button class="btn ghost" type="button" data-close>Cancel</button></div></form>`);
+    $('[data-close]').addEventListener('click', closeModal);
+    $('#applyForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      try {
+        await api.post(`/jobs/${job.id}/apply`, { coverNote: vals(event.target).coverNote });
+        closeModal(); toast('Application sent.'); go('jobs');
+      } catch (error) { toast(error.message); }
+    });
+  }));
+  $$('[data-view-job]').forEach((button) => button.addEventListener('click', () => {
+    const job = jobs.find((row) => String(row.id) === button.dataset.viewJob);
+    modal(`<h3>${esc(job.title)}</h3><p style="color:var(--mut)">${esc(job.organisation)} · ${esc(job.location)} · ${esc(job.workMode)}</p>
+      <p>${esc(job.description)}</p><p><b>Skills:</b> ${esc(job.skills || 'Not listed')}</p>
+      <div class="pgh"><button class="btn ghost" data-close>Close</button></div>`);
+    $('[data-close]').addEventListener('click', closeModal);
+  }));
+  $('#portfolioForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const values = vals(event.target);
+    try { await api.post('/me/portfolio', values); toast('Added to your portfolio.'); go('jobs'); }
+    catch (error) { toast(error.message); }
+  });
+  $$('[data-remove-portfolio]').forEach((button) => button.addEventListener('click', async () => {
+    try { await api.del(`/me/portfolio/${button.dataset.removePortfolio}`); toast('Removed.'); go('jobs'); }
+    catch (error) { toast(error.message); }
+  }));
+};
+
+PAGES.employer.jobs = async (page) => {
+  const jobs = await api.get('/employer/jobs').catch(() => []);
+  page.innerHTML = head('Jobs & applicants', 'Post opportunities and screen applicants by their verified work') +
+    card('Post an opportunity', `<form id="jobForm" class="fgrid">
+      ${fld('Role title', 'title', { required: true })}${fld('Organisation', 'organisation', { required: true })}
+      ${fld('Location', 'location', { required: true, value: 'Kampala, Uganda' })}
+      ${sel('Work mode', 'workMode', [{ value: 'ONSITE', label: 'On site' }, { value: 'HYBRID', label: 'Hybrid' }, { value: 'REMOTE', label: 'Remote' }])}
+      ${fld('Skills (comma separated)', 'skills')}
+      ${txt('Description', 'description', { required: true })}
+      <div class="pgh"><button class="btn" type="submit">Publish posting</button></div></form>`) +
+    card('My postings', jobs.length ? table(['Role', 'Location', 'Applicants', 'Status', 'Actions'], jobs.map((job) => [
+      `<strong>${esc(job.title)}</strong><br><small style="color:var(--mut)">${esc(job.organisation)}</small>`,
+      esc(job.location), '', tag(job.open ? 'Published' : 'Draft', job.open ? 'Open' : 'Closed'),
+      `<span class="pgh"><button class="btn ghost sm" data-applicants="${job.id}">Applicants</button>
+        ${job.open ? `<button class="btn ghost sm" data-close-job="${job.id}">Close</button>` : ''}</span>`,
+    ])) : empty('No postings yet.'));
+
+  $('#jobForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    try { await api.post('/employer/jobs', vals(event.target)); toast('Posting published.'); go('jobs'); }
+    catch (error) { toast(error.message); }
+  });
+  $$('[data-close-job]').forEach((button) => button.addEventListener('click', async () => {
+    try { await api.post(`/employer/jobs/${button.dataset.closeJob}/close`); toast('Posting closed.'); go('jobs'); }
+    catch (error) { toast(error.message); }
+  }));
+  $$('[data-applicants]').forEach((button) => button.addEventListener('click', async () => {
+    try {
+      const rows = await api.get(`/employer/jobs/${button.dataset.applicants}/applicants`);
+      modal(`<h3>Applicants</h3>${rows.length ? rows.map((row) => `<div class="act">
+        <div class="ic c2">${esc((row.learner || '?').slice(0, 1))}</div>
+        <div class="grow"><b>${esc(row.learner)}</b>
+        <small style="display:block;color:var(--mut)">${esc(row.country || '')} · ${esc(row.status)}</small>
+        <small style="display:block">${esc(row.coverNote)}</small></div>
+        <button class="btn ok sm" data-hire="${row.id}">Hire</button>
+        <button class="btn ghost sm" data-reject="${row.id}">Reject</button></div>`).join('') : empty('No applicants yet.')}
+        <div class="pgh"><button class="btn ghost" data-close>Close</button></div>`);
+      $('[data-close]').addEventListener('click', closeModal);
+      const decide = async (id, status) => {
+        try { await api.post(`/employer/applications/${id}/decision`, { status }); closeModal(); toast('Decision saved.'); go('jobs'); }
+        catch (error) { toast(error.message); }
+      };
+      $$('[data-hire]').forEach((b) => b.addEventListener('click', () => decide(b.dataset.hire, 'HIRED')));
+      $$('[data-reject]').forEach((b) => b.addEventListener('click', () => decide(b.dataset.reject, 'REJECTED')));
+    } catch (error) { toast(error.message); }
+  }));
+};
 
 async function route() {
   delegate();

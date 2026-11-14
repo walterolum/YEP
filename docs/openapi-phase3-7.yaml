@@ -1,0 +1,215 @@
+openapi: 3.0.3
+info:
+  title: YEP API — phases 3 to 7
+  version: "3.7.0"
+  description: Interactive learning, sessions, funding, jobs and impact endpoints added after phases 1-2.
+servers:
+  - url: /api
+security:
+  - bearerAuth: []
+paths:
+  /learning/lessons/{lessonId}/extras:
+    get:
+      summary: Note, Q&A, practice questions, coding exercise and XP profile for a lesson
+      parameters: [{ name: lessonId, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: Lesson extras } }
+  /learning/lessons/{lessonId}/note:
+    put:
+      summary: Save private notes for a lesson
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { body: { type: string, maxLength: 5000 } } }
+      responses: { "200": { description: Saved note } }
+  /learning/lessons/{lessonId}/posts:
+    post:
+      summary: Ask a question on a lesson
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [body], properties: { body: { type: string } } }
+      responses: { "200": { description: Created post } }
+  /learning/lessons/{lessonId}/practice:
+    post:
+      summary: Answer a practice question and receive correctness plus mastery
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [questionId, choice]
+              properties:
+                questionId: { type: integer }
+                choice: { type: string, description: Option letter A-D or option text }
+      responses: { "200": { description: Practice result } }
+  /learning/courses/{courseId}/mastery:
+    get:
+      summary: Per-course practice mastery
+      parameters: [{ name: courseId, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: Mastery percentage } }
+  /learning/profile:
+    get:
+      summary: XP, completed lessons, practice counts and badges
+      responses: { "200": { description: Learning profile } }
+  /learning/coding/{exerciseId}/submit:
+    post:
+      summary: Submit code for an exercise
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [code], properties: { code: { type: string } } }
+      responses: { "200": { description: "PASSED, FAILED or REVIEW" } }
+  /learning/assessments/{assessmentId}/attempts:
+    post:
+      summary: Start a timed attempt
+      parameters: [{ name: assessmentId, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: Attempt with deadline } }
+    get:
+      summary: List the learner's attempts
+      responses: { "200": { description: Attempt history } }
+  /sessions/series:
+    post:
+      summary: Create a recurring series of sessions (ADMIN, FACILITATOR, INSTRUCTOR)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, type, startsAt, repeatWeeks, durationMinutes]
+              properties:
+                title: { type: string }
+                type: { type: string, enum: [WORKSHOP, WEBINAR, DISCUSSION, PROJECT] }
+                startsAt: { type: string, format: date-time }
+                repeatWeeks: { type: integer, minimum: 1, maximum: 26 }
+                durationMinutes: { type: integer, minimum: 15, maximum: 480 }
+                cohort: { type: string }
+      responses: { "200": { description: Series id, provider and session ids } }
+  /sessions/calendar.ics:
+    get:
+      summary: Calendar export of the learner's registered sessions
+      responses: { "200": { description: text/calendar body } }
+  /sessions/{sessionId}/attend:
+    post:
+      summary: Self check-in and attendance record
+      responses: { "200": { description: Attendance recorded } }
+  /sessions/{sessionId}/recordings:
+    get: { summary: List recordings, responses: { "200": { description: Recording list } } }
+    post:
+      summary: Attach a recording (staff)
+      responses: { "200": { description: Recording stored } }
+  /sessions/recordings/{recordingId}/publish:
+    post:
+      summary: Publish a recording as a lesson in a module
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [moduleId], properties: { moduleId: { type: integer } } }
+      responses: { "200": { description: Created lesson } }
+  /sessions/{sessionId}/feedback:
+    post:
+      summary: Rate a session (1-5)
+      responses: { "200": { description: Feedback saved } }
+  /sessions/{sessionId}/slots:
+    get: { summary: List booking slots, responses: { "200": { description: Slots } } }
+    post:
+      summary: Create a booking slot (staff)
+      responses: { "200": { description: Slot created } }
+  /sessions/slots/{slotId}/book:
+    post:
+      summary: Book a slot
+      responses:
+        "200": { description: Booked }
+        "400": { description: Slot full or already booked }
+  /funding/aid:
+    post:
+      summary: Apply for financial aid on a course
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [courseId, reason]
+              properties:
+                courseId: { type: integer }
+                reason: { type: string, maxLength: 1000 }
+                incomeBand: { type: string }
+      responses: { "200": { description: Application } }
+    get: { summary: My aid applications, responses: { "200": { description: Applications } } }
+  /admin/funding/aid:
+    get:
+      summary: Aid queue (ADMIN)
+      responses: { "200": { description: Applications } }
+  /admin/funding/aid/{applicationId}/decision:
+    post:
+      summary: Approve or reject an aid application (ADMIN)
+      responses: { "200": { description: Decided application } }
+  /funding/sponsorships:
+    post:
+      summary: Sponsor a learner's seat (SPONSOR, ADMIN)
+      responses: { "200": { description: Sponsorship } }
+    get: { summary: My sponsorships, responses: { "200": { description: Sponsorships } } }
+  /funding/payment-intents:
+    post:
+      summary: Create a payment intent and reference
+      responses: { "200": { description: Pending intent } }
+    get: { summary: My payment intents, responses: { "200": { description: Intents } } }
+  /admin/funding/payment-intents/{reference}/confirm:
+    post:
+      summary: Confirm a payment and open the seat (ADMIN)
+      responses: { "200": { description: Paid intent } }
+  /admin/certificates/course/{courseId}/learners/{learnerId}:
+    post:
+      summary: Issue a course certificate after completion
+      responses:
+        "200": { description: Certificate with code }
+        "400": { description: Course not completed }
+  /public/certificates/{code}:
+    get:
+      summary: Public certificate verification
+      security: []
+      responses:
+        "200": { description: Holder, award and validity }
+        "404": { description: Unknown code }
+  /jobs:
+    get: { summary: Open job postings, responses: { "200": { description: Postings } } }
+  /employer/jobs:
+    get: { summary: My postings, responses: { "200": { description: Postings } } }
+    post:
+      summary: Post an opportunity (EMPLOYER, ADMIN)
+      responses: { "200": { description: Created posting } }
+  /employer/jobs/{postingId}/close:
+    post: { summary: Close a posting, responses: { "200": { description: Closed posting } } }
+  /jobs/{postingId}/apply:
+    post:
+      summary: Apply once to a posting
+      responses: { "200": { description: Application } }
+  /me/job-applications:
+    get: { summary: My applications, responses: { "200": { description: Applications } } }
+  /employer/jobs/{postingId}/applicants:
+    get: { summary: Applicants for my posting, responses: { "200": { description: Applicants } } }
+  /employer/applications/{applicationId}/decision:
+    post:
+      summary: Decide SHORTLISTED, HIRED or REJECTED
+      responses: { "200": { description: Updated application } }
+  /jobs/{postingId}/save:
+    post: { summary: Save a job, responses: { "200": { description: Saved } } }
+    delete: { summary: Remove a saved job, responses: { "200": { description: Removed } } }
+  /me/saved-jobs:
+    get: { summary: Saved jobs, responses: { "200": { description: Jobs } } }
+  /me/portfolio:
+    get: { summary: My portfolio, responses: { "200": { description: Items } } }
+    post: { summary: Add a portfolio item, responses: { "200": { description: Item } } }
+  /me/portfolio/{itemId}:
+    delete: { summary: Remove a portfolio item, responses: { "200": { description: Removed } } }
+  /impact/summary:
+    get:
+      summary: Impact figures (ADMIN, SPONSOR, PARTNER, FACILITATOR)
+      responses: { "200": { description: Summary } }
+  /impact/records:
+    post: { summary: Add a manual impact record (ADMIN), responses: { "200": { description: Record } } }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

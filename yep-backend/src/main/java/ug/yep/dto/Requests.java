@@ -275,4 +275,80 @@ public final class Requests {
     public record MentorSessionRequest(@NotBlank @Size(max = 160) String title,
                                        @NotNull Instant startsAt) {
     }
+
+    public record NoteRequest(@Size(max = 5000) String body) {
+    }
+
+    public record LessonPostRequest(@NotBlank @Size(max = 2000) String body) {
+    }
+
+    public record PracticeRequest(@NotNull Long questionId, @NotBlank String choice) {
+    }
+
+    public record CodeRequest(@NotBlank String code) {
+    }
+
+    public record SeriesRequest(@NotBlank @Size(max = 160) String title,
+                                @NotBlank String type, @NotNull Instant startsAt,
+                                @Min(1) @Max(26) int repeatWeeks,
+                                @Min(15) @Max(480) int durationMinutes,
+                                @Size(max = 80) String cohort, Long programmeId) {
+    }
+
+    public record RecordingRequest(@NotBlank @Size(max = 160) String title,
+                                   @NotBlank @Size(max = 500) String url,
+                                   String transcript) {
+    }
+
+    public record PublishRecordingRequest(@NotNull Long moduleId) {
+    }
+
+    public record SessionFeedbackRequest(@Min(1) @Max(5) int rating,
+                                         @Size(max = 1000) String comment) {
+    }
+
+    public record SlotRequest(@NotNull Instant startsAt, @NotNull Instant endsAt,
+                              @Min(1) @Max(50) int capacity) {
+    }
+
+    public record AidRequest(@NotNull Long courseId, @NotBlank @Size(max = 1000) String reason,
+                             @Size(max = 40) String incomeBand) {
+    }
+
+    public record AidDecisionRequest(boolean approved, @Size(max = 1000) String note) {
+    }
+
+    public record SponsorshipRequest(@NotBlank String learnerEmail, @NotNull Long courseId) {
+    }
+
+    public record PaymentRequest(@NotNull Long courseId, @NotNull @Min(1) Long amountCents,
+                                 @Size(max = 3) String currency) {
+    }
+
+    public record JobRequest(@NotBlank @Size(max = 160) String title,
+                             @NotBlank @Size(max = 160) String organisation,
+                             @NotBlank @Size(max = 120) String location,
+                             @Size(max = 20) String workMode,
+                             @NotBlank @Size(max = 5000) String description,
+                             @Size(max = 500) String skills, Instant closesAt) {
+    }
+
+    public record JobApplyRequest(@NotBlank @Size(max = 2000) String coverNote) {
+    }
+
+    public record JobDecisionRequest(@NotBlank String status) {
+    }
+
+    public record PortfolioRequest(@NotBlank @Size(max = 160) String title,
+                                   @Size(max = 1000) String description,
+                                   @Size(max = 500) String url,
+                                   @NotBlank String type) {
+    }
+
+    public record ImpactRequest(@NotBlank @Size(max = 80) String country,
+                                @Size(max = 20) String gender,
+                                @Size(max = 40) String educationLevel,
+                                @Min(0) int learners, @Min(0) int certificates,
+                                @Min(0) int placements, @Size(max = 20) String period) {
+    }
 }

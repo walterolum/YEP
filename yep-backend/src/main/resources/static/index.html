@@ -6,6 +6,8 @@
     <title>YEP – Youth Empowerment Management System</title>
     <meta name="description" content="YEP is a two-level youth empowerment programme: digital and AI literacy, then a funded community impact project.">
     <link rel="stylesheet" href="/css/style.css">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#f5c518">
 </head>
 <body>
 <div id="app">
@@ -41,5 +43,10 @@
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script type="module" src="/js/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+  }
+</script>
 </body>
 </html>

@@ -97,9 +97,7 @@ public class AssessmentService {
         if (Instant.now().isAfter(assessment.getDueDate())) {
             throw new BusinessRuleException("The deadline for this assessment has passed.");
         }
-        if (submissions.findByAssessmentIdAndUserId(assessmentId, userId).isPresent()) {
-            throw new BusinessRuleException("You have already submitted this assessment.");
-        }
+        // Retakes are allowed while results are unpublished; each attempt is recorded.
         User participant = users.findById(userId).orElseThrow(() -> new NotFoundException("Account"));
         Submission submission = new Submission(assessment, participant);
 

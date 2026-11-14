@@ -46,6 +46,44 @@ public class EventSession extends BaseEntity {
     @Column(name = "room_name", length = 100)
     private String roomName;
 
+    @Column(name = "provider", nullable = false, length = 20)
+    private String provider = "jitsi";
+
+    @Column(name = "room_url", length = 500)
+    private String roomUrl;
+
+    @Column(name = "duration_minutes", nullable = false)
+    private int durationMinutes = 60;
+
+    @Column(name = "series_id")
+    private Long seriesId;
+
+    /** Records which provider hosts the room and how long the session runs. */
+    public void applyRoom(String provider, String roomUrl, int durationMinutes, Long seriesId) {
+        this.provider = provider;
+        this.roomUrl = roomUrl;
+        this.durationMinutes = durationMinutes;
+        this.seriesId = seriesId;
+    }
+
+    public String getProvider() {
+        return provider;
+    }
+
+    public String getRoomUrl() {
+        return roomUrl;
+    }
+
+    public int getDurationMinutes() {
+        return durationMinutes;
+    }
+
+    public Long getSeriesId() {
+        return seriesId;
+    }
+
+
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "session_registrations",
             joinColumns = @JoinColumn(name = "session_id"),

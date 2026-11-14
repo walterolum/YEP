@@ -30,6 +30,26 @@ public class Certificate extends BaseEntity {
     @Column(name = "issued_at", nullable = false)
     private Instant issuedAt;
 
+    /** COURSE or PROGRAMME: what the certificate proves. */
+    @Column(name = "scope", nullable = false, length = 20)
+    private String scope = "PROGRAMME";
+
+    @Column(name = "scope_id")
+    private Long scopeId;
+
+    public void scopeTo(String scope, Long scopeId) {
+        this.scope = scope;
+        this.scopeId = scopeId;
+    }
+
+    public String getScope() {
+        return scope;
+    }
+
+    public Long getScopeId() {
+        return scopeId;
+    }
+
     protected Certificate() {
     }
 

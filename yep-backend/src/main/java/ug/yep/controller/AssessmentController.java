@@ -16,6 +16,7 @@ import ug.yep.dto.Views;
 import ug.yep.entity.Enums;
 import ug.yep.security.CurrentUser;
 import ug.yep.service.AssessmentService;
+import ug.yep.service.LearningExperienceService;
 
 /** Quiz taking, submission and result publishing. */
 @RestController
@@ -23,9 +24,11 @@ import ug.yep.service.AssessmentService;
 public class AssessmentController {
 
     private final AssessmentService assessments;
+    private final LearningExperienceService experience;
 
-    public AssessmentController(AssessmentService assessments) {
+    public AssessmentController(AssessmentService assessments, LearningExperienceService experience) {
         this.assessments = assessments;
+        this.experience = experience;
     }
 
     @GetMapping
@@ -46,7 +49,9 @@ public class AssessmentController {
     public Map<String, Object> submit(@AuthenticationPrincipal CurrentUser actor,
                                       @PathVariable Long assessmentId,
                                       @Valid @RequestBody Requests.SubmitAssessmentRequest request) {
-        return assessments.submit(actor.id(), assessmentId, request);
+        Map<String, Object> result = assessments.submit(actor.id(), assessmentId, request);
+        experience.recordSubmission(actor.id(), assessmentId);
+        return result;
     }
 
     @PostMapping

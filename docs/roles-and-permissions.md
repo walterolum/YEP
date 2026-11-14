@@ -141,6 +141,15 @@ and re-checked in `CourseContentService`, so URL rules and service rules agree e
 | Other `/api/content/**` | `ROLE_ADMIN`, `ROLE_FACILITATOR`, `ROLE_INSTRUCTOR` |
 | `POST /api/auth/resend-verification` | any signed-in account |
 | `POST /api/courses/{slug}/reviews` | enrolled participant (403 otherwise) |
+| `GET/PUT /api/learning/**` | authenticated learner |
+| `POST /api/sessions/series`, `…/recordings`, `…/slots` | `ROLE_ADMIN`, `ROLE_FACILITATOR`, `ROLE_INSTRUCTOR` |
+| `/api/funding/**` | authenticated; sponsorships require `ROLE_SPONSOR` |
+| `/api/admin/funding/**` | `ROLE_ADMIN` |
+| `/api/employer/jobs/**`, `/api/employer/applications/**` | `ROLE_ADMIN`, `ROLE_EMPLOYER` |
+| `GET /api/jobs`, `/api/me/**` | authenticated learner |
+| `GET /api/impact/summary` | `ROLE_ADMIN`, `ROLE_SPONSOR`, `ROLE_PARTNER`, `ROLE_FACILITATOR` |
+| `POST /api/impact/records` | `ROLE_ADMIN` |
+| `GET /api/public/certificates/{code}` | anonymous |
 | `GET /api/courses/{slug}/reviews` | anonymous |
 
 ## 6. Content authorship and publication

@@ -1,5 +1,29 @@
 # Changelog
 
+## Phases 3–7 — learning experience, sessions, funding, jobs, hardening (14 November 2026)
+
+### Added
+
+- **Phase 3 / V13**: lesson video, transcript and caption fields; private lesson notes; per-lesson Q&A;
+  practice questions with per-course mastery; coding exercises with a `CodeRunner` abstraction; XP and
+  badges from real activity; assessment attempts (retakes while results are unpublished). Practice
+  quizzes for Python and SQL, three coding exercises. Rollback `R12`.
+- **Phase 4 / V14**: session provider/room metadata, recurring `session_series`, recordings publishable
+  as lessons, self check-in and attendance, session feedback, booking slots with capacity guards, and
+  RFC 5545 `calendar.ics` exports. LiveKit when configured, Jitsi fallback. Rollback `R13`.
+- **Phase 5 / V15, V18**: financial aid applications with an admin decision queue, sponsor-funded seats,
+  `payment_intents` with admin confirmation (provider abstraction), course-scoped certificates and public
+  verification. V18 fixes the legacy one-certificate-per-user key. Rollbacks `R14`, `R17`.
+- **Phase 6 / V16**: employer job postings, single application per learner, employer screening
+  (shortlist/hire/reject), saved jobs, learner portfolios, and impact reporting by country, gender and
+  education level. Rollback `R15`.
+- **Phase 7 / V17**: nine additive performance indexes (idempotent migration), installable PWA
+  (manifest + shell-caching service worker), `docs/openapi-phase3-7.yaml` and the phase 3–7 coverage
+  report. Rollback `R16`.
+- **SPA**: jobs and portfolio screens for learners, employer posting and applicant decisions, lesson
+  notes, practice and Q&A inside the lesson reader.
+- Tests: 131 total, adding learning experience (6), sessions (4), funding (5) and careers (5) suites.
+
 ## Tech & Digital course set (14 November 2026)
 
 ### Added
